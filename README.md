@@ -106,6 +106,7 @@ Problemas reais de mídia e rede serão documentados à medida que forem observa
 - [Guia didático do código](docs/03-guia-do-codigo.md)
 - [Ambiente e validação](docs/04-validacao.md)
 - [Execução e explicação da Etapa 1](docs/05-etapa-1.md)
+- [Preparação da Etapa 2 e configuração de rede](docs/06-etapa-2.md)
 
 O Git é local, com branch `main`, sem publicação remota. Use commits pequenos e
 coerentes. Versione os lockfiles; não versione saídas de compilação, segredos ou

@@ -7,3 +7,4 @@ pub mod api;
 pub mod chamada;
 mod frb_generated;
 pub mod midia;
+mod rede;

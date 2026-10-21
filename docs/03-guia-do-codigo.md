@@ -63,6 +63,17 @@ conhecem VP8 e Opus, mas não participam de ICE, DTLS ou SRTP entre os dispositi
 `Recursos` guarda WebSocket, conexão WebRTC, mídia e tarefas. O bloco final de
 `executar` libera tudo tanto na saída normal quanto no erro ou cancelamento.
 
+`rede.rs` lê o JSON opcional indicado por `CHAMADA_CONFIG`, valida a sinalização
+e monta a configuração ICE. Sem arquivo, mantém LAN sem servidores externos.
+STUN descobre endereços; TURN pode retransmitir mídia. A opção de retransmissão
+forçada exige TURN. A configuração é lida ao entrar, antes dos dispositivos,
+sem alterar a API gerada ou colocar decisões de rede no Flutter.
+
+Depois de conectar, `chamada.rs` consulta o transporte ICE alcançado pelo sender
+de mídia. O evento `caminho_ice` informa se o par selecionado contém `relay`.
+Flutter guarda esse texto separado do estado para apresentá-lo durante a chamada.
+O guia da Etapa 2 explica configuração, credenciais e limites desse diagnóstico.
+
 ## Captura e codecs
 
 `midia.rs` localiza os executáveis, enumera dispositivos DirectShow, cria os

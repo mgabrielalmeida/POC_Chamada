@@ -40,6 +40,7 @@ class _TelaChamadaState extends State<TelaChamada> {
   StreamSubscription<EventoChamada>? _assinatura;
   AppLifecycleListener? _ciclo;
   String _estado = 'Carregando Rust…';
+  String? _caminhoIce;
   String? _erro;
   bool _pronta = false;
   bool _ativa = false;
@@ -83,6 +84,8 @@ class _TelaChamadaState extends State<TelaChamada> {
           _estado = evento.texto;
         case 'estado':
           _estado = evento.texto;
+        case 'caminho_ice':
+          _caminhoIce = evento.texto;
         case 'erro':
           _erro = evento.texto;
         case 'aviso':
@@ -156,6 +159,7 @@ class _TelaChamadaState extends State<TelaChamada> {
 
   void _limparImagens() {
     _geracao++;
+    _caminhoIce = null;
     _local?.dispose();
     _remoto?.dispose();
     _local = null;
@@ -245,6 +249,7 @@ class _TelaChamadaState extends State<TelaChamada> {
           ),
           const SizedBox(height: 16),
           Text(_estado),
+          if (_caminhoIce != null) Text(_caminhoIce!),
           if (_erro != null)
             Text(_erro!, style: const TextStyle(color: Colors.red)),
           const SizedBox(height: 16),

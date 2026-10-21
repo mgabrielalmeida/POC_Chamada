@@ -127,3 +127,26 @@ dispositivo ou detalhes do pacote utilizado; esses dados não foram presumidos.
   importação Windows; não impediram a compilação.
 
 A conclusão da Etapa 1 não comprova conectividade entre redes diferentes ou TURN.
+
+## Etapa 2 — configuração local do cliente — 21/10/2026
+
+- O responsável informou que está sem acesso à máquina de hospedagem e pediu
+  continuidade sem ela. A implementação local avança; não se presume sistema,
+  IP público, domínio ou acesso administrativo dessa máquina.
+- Adicionados JSON local opcional (`CHAMADA_CONFIG`), STUN/TURN por UDP,
+  retransmissão forçada e suporte WSS com raízes confiáveis do sistema.
+- A API Flutter–Rust foi preservada. O evento adicional `caminho_ice` apresenta
+  o tipo do par realmente selecionado, separado do estado da chamada.
+- `cargo test -p chamada --lib`: quatro testes aprovados. Cobrem manutenção da
+  configuração LAN, mapeamento TURN/Relay, rejeição de configuração inválida e
+  exigência de TLS para token fora do loopback, sem expor os segredos nos erros.
+- `dart format lib tool`: cinco arquivos verificados, sem alterações necessárias.
+- `flutter analyze`: nenhum problema encontrado.
+- Esses testes não exercitam um servidor TURN nem um endpoint WSS. A aceitação
+  em redes diferentes continua pendente, inclusive chamada de cinco minutos,
+  liberação dos dispositivos, repetição e ensaio com retransmissão forçada.
+- `cargo test -p chamada --test chamada_sintetica -- --ignored --nocapture`:
+  aprovado. Duas chamadas seguidas em loopback receberam vídeo remoto e PCM
+  nos dois clientes, liberaram recursos e apresentaram `direto (local=host,
+  remoto=host)` em ambos. Rodada 1: quadros `[5, 5]`, blocos PCM `[66, 69]`;
+  rodada 2: quadros `[5, 14]`, blocos PCM `[83, 83]`. Sem captura real ou som.

@@ -1,11 +1,13 @@
 //! Uma conexão WebRTC por sessão. A sinalização só transporta a negociação SDP.
 use crate::api::EventoChamada as Evento;
 use crate::midia::{EventoMidia, Midia};
+use crate::rede::Rede;
 use anyhow::{Context, Result, bail};
 use bytes::BytesMut;
 use futures_util::{SinkExt, StreamExt};
 use rtc::{
     media_stream::MediaStreamTrack,
+    peer_connection::transport::RTCIceCandidateType,
     rtp,
     rtp_transceiver::rtp_sender::{
         RTCRtpCodec, RTCRtpCodecParameters, RTCRtpCodingParameters, RTCRtpEncodingParameters,
@@ -29,8 +31,8 @@ use webrtc::{
     },
     peer_connection::{
         MediaEngine, PeerConnection, PeerConnectionBuilder, PeerConnectionEventHandler,
-        RTCConfigurationBuilder, RTCIceGatheringState, RTCPeerConnectionState,
-        RTCSessionDescription, Registry, register_default_interceptors,
+        RTCIceGatheringState, RTCPeerConnectionState, RTCSessionDescription, Registry,
+        register_default_interceptors,
     },
 };
 
@@ -124,16 +126,18 @@ async fn conectar(
     eventos: &mpsc::Sender<Evento>,
     recursos: &mut Recursos,
 ) -> Result<()> {
-    if !endereco.starts_with("ws://") {
-        bail!("Na Etapa 1 use ws://IP_DO_SERVIDOR:8080");
-    }
+    let rede = Rede::carregar()?;
+    rede.validar_sinalizacao(endereco)?;
+    let configuracao_ice = rede.configuracao_ice()?;
     let (ws, _) = timeout(Duration::from_secs(10), connect_async(endereco))
         .await
         .context("Tempo esgotado ao conectar à sinalização")??;
     recursos.sinalizacao = Some(ws);
     let ws = recursos.sinalizacao.as_mut().unwrap();
     ws.send(Message::Text(
-        json!({"tipo":"entrar","sala":sala}).to_string().into(),
+        json!({"tipo":"entrar","sala":sala,"token":rede.token_sinalizacao})
+            .to_string()
+            .into(),
     ))
     .await?;
     let ofertante = loop {
@@ -236,11 +240,11 @@ async fn conectar(
     let interceptores = register_default_interceptors(Registry::new(), &mut motor)?;
     let conexao: Arc<dyn PeerConnection> = Arc::new(
         PeerConnectionBuilder::new()
-            .with_configuration(RTCConfigurationBuilder::default().build())
+            .with_configuration(configuracao_ice)
             .with_media_engine(motor)
             .with_interceptor_registry(interceptores)
             .with_handler(Arc::new(Observador { coleta, mudancas }))
-            // Sem STUN/TURN externo na LAN. O wildcard reúne endereços locais.
+            // O wildcard reúne endereços locais; STUN/TURN são opcionais.
             .with_udp_addrs(vec!["0.0.0.0:0"])
             .build()
             .await?,
@@ -269,6 +273,7 @@ async fn conectar(
     }
     let mut negociada = false;
     let mut conectada = false;
+    let mut caminho_ice = String::new();
     let mut vigilancia = tokio::time::interval(Duration::from_secs(1));
     let inicio = tokio::time::Instant::now();
     loop {
@@ -331,6 +336,20 @@ async fn conectar(
             },
             _ = vigilancia.tick() => {
                 recursos.midia.as_mut().unwrap().verificar_processos()?;
+                if conectada {
+                    if let Some(sender) = conexao.get_senders().await.first() {
+                        if let Some(transporte) = sender.transport().await? {
+                            if let Some(par) = transporte.ice_transport().get_selected_candidate_pair().await? {
+                                let retransmitida = par.local().typ == RTCIceCandidateType::Relay || par.remote().typ == RTCIceCandidateType::Relay;
+                                let caminho = format!("Caminho ICE: {} (local={}, remoto={}).", if retransmitida { "retransmissão TURN" } else { "direto" }, par.local().typ, par.remote().typ);
+                                if caminho != caminho_ice {
+                                    eventos.send(Evento::texto("caminho_ice", &caminho)).await?;
+                                    caminho_ice = caminho;
+                                }
+                            }
+                        }
+                    }
+                }
                 if !conectada && inicio.elapsed() > Duration::from_secs(30) { bail!("A conexão WebRTC não foi estabelecida em 30 segundos"); }
                 if eventos.is_closed() { return Ok(()); }
             }
@@ -340,7 +359,7 @@ async fn conectar(
 
 async fn aguardar_coleta(coleta: &mut watch::Receiver<bool>) -> Result<()> {
     timeout(
-        Duration::from_secs(10),
+        Duration::from_secs(30),
         coleta.wait_for(|completa| *completa),
     )
     .await

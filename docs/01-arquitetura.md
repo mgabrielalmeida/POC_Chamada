@@ -65,3 +65,12 @@ não se assume que ela execute um serviço TURN específico nativamente no Windo
 O servidor de sinalização da POC será escrito em Rust; TURN é um serviço separado.
 Endereços, portas, credenciais e proteção do acesso serão definidos antes de
 expor os serviços à internet.
+
+## Preparação local da Etapa 2
+
+O cliente já admite configuração STUN/TURN por UDP e retransmissão forçada por
+arquivo local opcional. WSS usa TLS com certificados confiáveis pelo Windows.
+Rust continua responsável pela rede; a interface apenas apresenta o tipo do
+caminho ICE realmente selecionado. Sem configuração, o comportamento LAN é
+preservado. A máquina pública segue indisponível para inspeção; não há implantação
+validada. O procedimento está no [guia da Etapa 2](06-etapa-2.md).

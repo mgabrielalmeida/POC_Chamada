@@ -1,0 +1,11 @@
+{
+  "token_sinalizacao": "SUBSTITUIR_PELO_TOKEN_DA_SINALIZACAO",
+  "servidores_ice": [
+    {
+      "urls": ["stun:SEU_HOST_PUBLICO:3478", "turn:SEU_HOST_PUBLICO:3478?transport=udp"],
+      "usuario": "SUBSTITUIR_PELO_USUARIO_TURN",
+      "senha": "SUBSTITUIR_PELA_SENHA_TURN"
+    }
+  ],
+  "somente_retransmissao": false
+}

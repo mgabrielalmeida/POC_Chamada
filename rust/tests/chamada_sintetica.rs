@@ -33,8 +33,12 @@ async fn duas_chamadas_seguidas_transportam_e_decodificam_video_e_audio() {
         ));
         let mut quadros = [0; 2];
         let mut audios = [0; 2];
+        let mut caminhos = [false; 2];
         let resultado = timeout(Duration::from_secs(45), async {
-            while quadros.iter().any(|n| *n < 5) || audios.iter().any(|n| *n < 5) {
+            while quadros.iter().any(|n| *n < 5)
+                || audios.iter().any(|n| *n < 5)
+                || caminhos.iter().any(|recebido| !recebido)
+            {
                 let (indice, evento) = tokio::select! {
                     evento = a.recv() => (0, evento),
                     evento = b.recv() => (1, evento),
@@ -47,6 +51,11 @@ async fn duas_chamadas_seguidas_transportam_e_decodificam_video_e_audio() {
                         quadros[indice] += 1;
                     }
                     "audio_teste" => audios[indice] += 1,
+                    "caminho_ice" => {
+                        assert!(evento.texto.contains("direto"), "{}", evento.texto);
+                        caminhos[indice] = true;
+                        eprintln!("Cliente {indice}: {}", evento.texto);
+                    }
                     "erro" => return Err(evento.texto),
                     "estado" | "aviso" => eprintln!("Cliente {indice}: {}", evento.texto),
                     _ => {}
