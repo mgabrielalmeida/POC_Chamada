@@ -101,19 +101,29 @@ A formatação Dart também precisou de acesso ao cache local da ferramenta.
   esse utilitário ao mesmo tempo que compila a DLL no Windows.
 - Não foi feita inspeção visual da janela nem aceitação humana de áudio/vídeo.
 
-## Limites atuais da Etapa 1
+## Aceitação da Etapa 1 — 21/10/2026
 
-- Pendente: chamada de cinco minutos em dois computadores físicos na mesma rede,
-  qualidade audível/visual, encerramento e nova chamada nesse cenário.
+O responsável informou: "A etapa 1 foi concluída e testada, está tudo funcionando
+entre dois dispositivos windows em uma mesma rede wi-fi."
+
+Com base nessa confirmação humana, a Etapa 1 está concluída. O relato comprova
+o funcionamento no cenário LAN informado, além das evidências automatizadas
+registradas acima. Não foram fornecidos duração medida, modelos do segundo
+dispositivo ou detalhes do pacote utilizado; esses dados não foram presumidos.
+
+## Limites de evidência preservados após a Etapa 1
+
+- O responsável confirmou a conclusão da chamada na LAN; não há registro
+  individual dos tempos e das observações de cada critério de aceitação.
 - O teste sintético decodifica PCM sem tocar som. Ele não comprova a reprodução
   audível pelo FFplay nem a escolha correta da saída de áudio em outro computador.
 - O diagnóstico de captura comprova leitura local, sem avaliar qualidade humana.
 - Build Release, distribuição e execução no segundo PC ainda não foram validados.
 - A proteção de helpers via Job Object está configurada e compilada; encerramento
   forçado pelo gerenciador de tarefas não foi ensaiado como teste separado.
-- Firewall, alcance LAN e a máquina da Etapa 2 ainda precisam de verificação real.
+- O funcionamento na LAN foi confirmado no teste informado. Alcance pela internet,
+  regras da infraestrutura pública e a máquina da Etapa 2 ainda precisam de verificação.
 - Os avisos de linker observados apenas informam a criação da biblioteca de
   importação Windows; não impediram a compilação.
 
-A implementação não encerra a aceitação da etapa. Registre aqui os resultados
-dos dois dispositivos antes de considerar o objetivo 1 concluído.
+A conclusão da Etapa 1 não comprova conectividade entre redes diferentes ou TURN.

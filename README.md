@@ -9,10 +9,11 @@ Flutter-Rust Bridge faz a comunicação entre essas camadas.
 
 ## Estado atual
 
-Implementação da Etapa 1 disponível: ponte Flutter–Rust, sinalização por salas e caminho
-de áudio e vídeo com `webrtc-rs`. A mídia usa FFmpeg auxiliar, controlado por Rust.
+**Etapa 1 concluída e testada em 21/10/2026:** funcionamento confirmado pelo
+responsável em dois dispositivos Windows na mesma rede Wi-Fi. A ponte
+Flutter–Rust, a sinalização por salas e áudio/vídeo usam `webrtc-rs`, com FFmpeg
+auxiliar controlado por Rust. A Etapa 2, entre redes diferentes, está em implementação.
 Os resultados e limites estão em [ambiente e validação](docs/04-validacao.md).
-A aceitação da chamada requer dois computadores físicos.
 
 ## Estrutura
 
@@ -76,8 +77,9 @@ flutter analyze
 flutter build windows --debug
 ```
 
-Esses comandos verificam compilação e análise. A aceitação da chamada exigirá dois computadores
-físicos e observação humana, conforme o [plano](docs/02-etapas.md).
+Esses comandos verificam compilação e análise. A aceitação da Etapa 1 foi
+informada pelo responsável; a Etapa 2 exige nova observação humana em redes
+diferentes, conforme o [plano](docs/02-etapas.md).
 
 ## Solução de problemas
 

@@ -11,9 +11,10 @@ Esta entrega não representa uma chamada ou integração entre linguagens.
 
 ## Etapa 1 — dois computadores na mesma rede
 
-Ponte e sinalização implementadas. A integração de mídia e sua verificação estão
-registradas em [validação](04-validacao.md); a aceitação humana abaixo permanece
-obrigatória antes de considerar a etapa concluída.
+**Concluída em 21/10/2026.** O responsável pelo teste confirmou o funcionamento
+entre dois dispositivos Windows na mesma rede Wi-Fi. A implementação, as
+verificações automatizadas e o relato de aceitação estão em
+[validação](04-validacao.md).
 
 Ordem de trabalho sugerida:
 
@@ -39,6 +40,10 @@ Registrar resultado, versões, equipamentos, problemas e limitações observadas
 Build, logs e testes automatizados não substituem essa aceitação.
 
 ## Etapa 2 — computadores em redes diferentes
+
+**Em implementação.** A preparação do cliente e da sinalização pode avançar
+localmente; a implantação depende de confirmar a máquina disponível, seu acesso
+administrativo e sua conectividade pública.
 
 1. Inspecionar a máquina disponível: sistema, administração e acesso pela internet.
 2. Disponibilizar sinalização com configuração explícita e acesso controlado.
