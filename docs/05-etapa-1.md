@@ -36,4 +36,28 @@ arquivo curto `app/windows/rust.cmake`, sem pacote auxiliar de compilação.
 - [Dispositivos DirectShow no FFmpeg](https://ffmpeg.org/ffmpeg-devices.html#dshow)
 - [Distribuições Windows indicadas pelo FFmpeg](https://ffmpeg.org/download.html#build-windows)
 
+## Sinalização LAN
+
+Na raiz, `cargo run -p sinalizacao` inicia o servidor em `0.0.0.0:8080`.
+Para escolher outro endereço: `cargo run -p sinalizacao -- 127.0.0.1:8081`.
+O aplicativo usará `ws://IP_DO_COMPUTADOR:8080`. Uma sala admite duas pessoas.
+
+O protocolo usa JSON por WebSocket:
+
+- `entrar`, com `sala`: primeira mensagem de cada cliente.
+- `aguardando`: a primeira pessoa aguarda a segunda.
+- `pronto`, com `ofertante`: define quem cria a oferta para evitar colisão.
+- `descricao`, com `descricao`: encaminha a oferta ou a resposta SDP completa.
+- `saiu`: o outro participante desconectou; a sala é removida.
+- `erro`, com `mensagem`: informa sala inválida ou lotada.
+
+O nome da sala aceita até 48 letras ASCII, números, `-` ou `_`. A sala nasce
+quando a primeira pessoa entra e não persiste após o encerramento. Para uma
+nova chamada, ambos entram novamente. O servidor verifica resposta a pings e
+limita mensagens a 64 KiB. Não usa banco de dados nem transmite mídia.
+
+Esta versão usa `ws://` para teste em rede local confiável, sem autenticação.
+Não exponha esse servidor à internet; a Etapa 2 tratará o acesso externo.
+Verifique o servidor com `cargo test -p sinalizacao`.
+
 As instruções de chamada serão acrescentadas junto à integração funcional.

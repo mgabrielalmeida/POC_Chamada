@@ -53,3 +53,13 @@ A formatação Dart também precisou de acesso ao cache local da ferramenta.
 - O gerador precisou instalar `cargo-expand` antes da primeira geração.
 - A análise apontou imports relativos no utilitário de verificação; foram
   corrigidos para imports `package:` antes da nova análise.
+- Nova execução de `flutter analyze`: nenhum problema encontrado.
+
+## Etapa 1 — sinalização
+
+- `cargo check -p sinalizacao`: aprovado.
+- `cargo test -p sinalizacao`: dois testes de integração aprovados com sockets
+  WebSocket reais em loopback e portas escolhidas pelo sistema.
+- Cobertos: papéis oferta/resposta, encaminhamento de SDP, sala lotada, nome
+  inválido, mensagem malformada, aviso de saída e reutilização da sala.
+- Estes testes não comprovam acesso pela LAN, firewall ou mídia.

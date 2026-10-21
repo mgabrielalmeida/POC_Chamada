@@ -1,9 +1,17 @@
-//! Ponto de entrada reservado para o servidor de sinalização.
-//!
-//! A implementação futura manterá salas de duas pessoas em memória e
-//! encaminhará mensagens de negociação entre elas. Não haverá banco de dados.
-
-fn main() {
-    // Não abrimos uma porta nesta etapa: o protocolo ainda será implementado.
-    println!("Base do servidor criada. A sinalização ainda não foi implementada.");
+//! Servidor LAN. O endereço pode ser informado como primeiro argumento.
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
+    let endereco = std::env::args()
+        .nth(1)
+        .unwrap_or_else(|| "0.0.0.0:8080".into());
+    let ouvinte = tokio::net::TcpListener::bind(&endereco).await?;
+    println!(
+        "Sinalização LAN em ws://{}. Ctrl+C encerra.",
+        ouvinte.local_addr()?
+    );
+    tokio::select! {
+        resultado = sinalizacao::executar(ouvinte) => resultado?,
+        _ = tokio::signal::ctrl_c() => {},
+    }
+    Ok(())
 }
