@@ -8,3 +8,6 @@ description = "Camada técnica da POC de chamada para Windows"
 [lib]
 # A biblioteca dinâmica será consumida pelo Flutter-Rust Bridge.
 crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+flutter_rust_bridge = "=2.13.0"

@@ -44,3 +44,12 @@ A formatação Dart também precisou de acesso ao cache local da ferramenta.
 - Nenhuma captura, reprodução, conexão de sinalização ou chamada foi testada.
 - A máquina que hospedará a segunda etapa ainda não foi inspecionada.
 - Aceitação visual e chamada em dois dispositivos físicos permanecem pendentes.
+
+## Etapa 1 — ponte
+
+- Gerados bindings FRB 2.13.0 para Rust e Dart.
+- `cargo build -p chamada`: DLL compilada.
+- `dart run tool/verificar_ponte.dart`: chamada real retornou a mensagem esperada.
+- O gerador precisou instalar `cargo-expand` antes da primeira geração.
+- A análise apontou imports relativos no utilitário de verificação; foram
+  corrigidos para imports `package:` antes da nova análise.

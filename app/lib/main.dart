@@ -1,12 +1,25 @@
 import 'package:flutter/material.dart';
 
-void main() {
-  runApp(const AplicativoChamada());
+import 'src/rust/api.dart';
+import 'src/rust/frb_generated.dart';
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  String mensagem;
+  try {
+    await RustLib.init();
+    mensagem = await verificarPonte();
+  } catch (erro) {
+    mensagem = 'Não foi possível carregar Rust: $erro';
+  }
+  runApp(AplicativoChamada(mensagem: mensagem));
 }
 
 /// Interface inicial. A comunicação técnica será fornecida pela camada Rust.
 class AplicativoChamada extends StatelessWidget {
-  const AplicativoChamada({super.key});
+  const AplicativoChamada({super.key, required this.mensagem});
+
+  final String mensagem;
 
   @override
   Widget build(BuildContext context) {
@@ -15,15 +28,11 @@ class AplicativoChamada extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       home: Scaffold(
         appBar: AppBar(title: const Text('POC de chamada')),
-        body: const Center(
+        body: Center(
           child: Padding(
-            padding: EdgeInsets.all(24),
-            // Texto estático para identificar a base, sem simular uma conexão.
-            child: Text(
-              'Base do projeto pronta.\n'
-              'A chamada de áudio e vídeo ainda não foi implementada.',
-              textAlign: TextAlign.center,
-            ),
+            padding: const EdgeInsets.all(24),
+            // O texto confirma uma chamada real à biblioteca nativa.
+            child: Text(mensagem, textAlign: TextAlign.center),
           ),
         ),
       ),

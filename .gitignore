@@ -1,5 +1,6 @@
 # Saídas locais; os arquivos de lock devem ser versionados.
 /target/
+/.local/
 **/.dart_tool/
 **/build/
 **/ephemeral/
