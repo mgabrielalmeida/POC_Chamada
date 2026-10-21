@@ -1,0 +1,16 @@
+# Arquivos locais do Dart e Flutter.
+.dart_tool/
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+build/
+coverage/
+.widget_preview/
+
+# Configurações locais do editor e saídas de depuração.
+*.iml
+*.ipr
+*.iws
+.idea/
+*.symbols
+*.map.json

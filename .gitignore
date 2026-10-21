@@ -1,0 +1,12 @@
+# Saídas locais; os arquivos de lock devem ser versionados.
+/target/
+**/.dart_tool/
+**/build/
+**/ephemeral/
+.idea/
+.vscode/
+*.iml
+*.log
+.env
+.env.*
+!.env.example

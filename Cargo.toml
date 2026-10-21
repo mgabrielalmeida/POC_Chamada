@@ -1,0 +1,4 @@
+# Cliente e servidor compartilham o mesmo workspace e lockfile.
+[workspace]
+members = ["rust", "servidor"]
+resolver = "3"

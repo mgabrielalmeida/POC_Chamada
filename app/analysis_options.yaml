@@ -1,0 +1,6 @@
+# Regras padrão, sem configuração adicional para esta POC.
+analyzer:
+  exclude:
+    - build/**
+    - windows/**
+include: package:flutter_lints/flutter.yaml

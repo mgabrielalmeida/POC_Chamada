@@ -1,0 +1,6 @@
+[package]
+name = "sinalizacao"
+version = "0.1.0"
+edition = "2024"
+publish = false
+description = "Servidor de sinalização Rust da POC de chamada"

@@ -1,0 +1,10 @@
+[package]
+name = "chamada"
+version = "0.1.0"
+edition = "2024"
+publish = false
+description = "Camada técnica da POC de chamada para Windows"
+
+[lib]
+# A biblioteca dinâmica será consumida pelo Flutter-Rust Bridge.
+crate-type = ["cdylib", "rlib"]
