@@ -15,6 +15,11 @@ Flutter–Rust, a sinalização por salas e áudio/vídeo usam `webrtc-rs`, com 
 auxiliar controlado por Rust. A Etapa 2, entre redes diferentes, está em implementação.
 Os resultados e limites estão em [ambiente e validação](docs/04-validacao.md).
 
+A preparação da Etapa 2 inclui configuração local de STUN/TURN, modo de
+retransmissão forçada, diagnóstico do caminho ICE e sinalização com token para
+uso atrás de WSS. Veja o [guia da Etapa 2](docs/06-etapa-2.md). A implantação e os
+testes entre redes aguardam acesso à máquina de hospedagem.
+
 ## Estrutura
 
 - `app/`: interface Flutter e executor nativo Windows.

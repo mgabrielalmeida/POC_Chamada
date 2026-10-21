@@ -9,7 +9,7 @@ use tokio::{
     time::{Instant, timeout},
 };
 use tokio_tungstenite::{
-    accept_async_with_config,
+    WebSocketStream, accept_async_with_config,
     tungstenite::{Message, protocol::WebSocketConfig},
 };
 
@@ -20,23 +20,52 @@ fn texto(valor: Value) -> Message {
     Message::Text(valor.to_string().into())
 }
 
+/// Completa o fechamento WebSocket antes de soltar o TCP. Sem essa espera,
+/// o Windows pode enviar reset e perder o último erro ou aviso de saída.
+async fn fechar_conexao(ws: &mut WebSocketStream<TcpStream>) {
+    let _ = timeout(Duration::from_secs(1), async {
+        let _ = ws.close(None).await;
+        while let Some(Ok(mensagem)) = ws.next().await {
+            if mensagem.is_close() {
+                break;
+            }
+        }
+    })
+    .await;
+}
+
 /// Aceita conexões até o processo ser encerrado. O chamador escolhe a interface.
 pub async fn executar(ouvinte: TcpListener) -> Result<()> {
+    executar_com_token(ouvinte, None).await
+}
+
+/// O token compartilhado protege a entrada; TLS fica no proxy da mesma máquina.
+pub async fn executar_com_token(ouvinte: TcpListener, token: Option<String>) -> Result<()> {
+    if token.as_ref().is_some_and(|valor| valor.trim().is_empty()) {
+        bail!("O token da sinalização não pode ser vazio");
+    }
+    let token = token.map(Arc::new);
     let salas: Salas = Arc::default();
     let mut proximo_id = 0;
     loop {
         let (socket, _) = ouvinte.accept().await?;
         proximo_id += 1;
         let salas = salas.clone();
+        let token = token.clone();
         tokio::spawn(async move {
-            if let Err(erro) = atender(socket, salas, proximo_id).await {
+            if let Err(erro) = atender(socket, salas, proximo_id, token).await {
                 eprintln!("Conexão encerrada: {erro:#}");
             }
         });
     }
 }
 
-async fn atender(socket: TcpStream, salas: Salas, id: u64) -> Result<()> {
+async fn atender(
+    socket: TcpStream,
+    salas: Salas,
+    id: u64,
+    token: Option<Arc<String>>,
+) -> Result<()> {
     let config = WebSocketConfig::default()
         .max_message_size(Some(64 * 1024))
         .max_frame_size(Some(64 * 1024));
@@ -50,6 +79,18 @@ async fn atender(socket: TcpStream, salas: Salas, id: u64) -> Result<()> {
         .await?
         .context("Conexão fechada antes de entrar")??;
     let entrada: Value = serde_json::from_str(primeira.to_text()?)?;
+    // Verifica antes de consultar/criar a sala. Nunca encaminha nem registra o token.
+    if token
+        .as_ref()
+        .is_some_and(|esperado| entrada["token"].as_str() != Some(esperado.as_str()))
+    {
+        ws.send(texto(
+            json!({"tipo":"erro","mensagem":"Acesso não autorizado."}),
+        ))
+        .await?;
+        fechar_conexao(&mut ws).await;
+        return Ok(());
+    }
     let nome = entrada["sala"].as_str().unwrap_or("");
     if entrada["tipo"] != "entrar"
         || nome.is_empty()
@@ -62,6 +103,7 @@ async fn atender(socket: TcpStream, salas: Salas, id: u64) -> Result<()> {
             json!({"tipo":"erro","mensagem":"Sala inválida. Use até 48 letras, números, - ou _."}),
         ))
         .await?;
+        fechar_conexao(&mut ws).await;
         bail!("Sala inválida");
     }
     let nome = nome.to_owned();
@@ -75,6 +117,7 @@ async fn atender(socket: TcpStream, salas: Salas, id: u64) -> Result<()> {
                 json!({"tipo":"erro","mensagem":"A sala já tem duas pessoas."}),
             ))
             .await?;
+            fechar_conexao(&mut ws).await;
             return Ok(());
         }
         pessoas.push((id, envio.clone()));
@@ -150,6 +193,8 @@ async fn atender(socket: TcpStream, salas: Salas, id: u64) -> Result<()> {
             }
         }
     }
-    let _ = saida.close().await;
+    if let Ok(mut ws) = saida.reunite(entrada) {
+        fechar_conexao(&mut ws).await;
+    }
     resultado
 }

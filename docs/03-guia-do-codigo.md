@@ -94,6 +94,15 @@ A primeira conexão oferece; a segunda responde. Ao sair alguém, a sala inteira
 é removida e a outra pessoa é avisada. Um identificador impede que a limpeza de
 uma conexão antiga apague uma nova sala com o mesmo nome.
 
+`executar` mantém o modo LAN; `executar_com_token` protege a entrada.
+`main.rs` lê `SINALIZACAO_TOKEN` e, quando configurado, escolhe loopback como
+endereço padrão para trabalhar atrás do proxy WSS. `atender` confere o token
+antes de criar a sala; encaminha apenas descrições, sem credenciais.
+
+`fechar_conexao` aguarda por até um segundo o fechamento WebSocket antes de
+liberar o TCP. Isso evita perder a última mensagem por reset no Windows, tanto
+na rejeição de entrada quanto na saída da sala.
+
 ## Arquivos gerados e verificações
 
 Não edite `rust/src/frb_generated.rs` ou `app/lib/src/rust/` manualmente. Altere

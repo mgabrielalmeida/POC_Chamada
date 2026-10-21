@@ -57,8 +57,9 @@ quando a primeira pessoa entra e não persiste após o encerramento. Para uma
 nova chamada, ambos entram novamente. O servidor verifica resposta a pings e
 limita mensagens a 64 KiB. Não usa banco de dados nem transmite mídia.
 
-Esta versão usa `ws://` para teste em rede local confiável, sem autenticação.
-Não exponha esse servidor à internet; a Etapa 2 tratará o acesso externo.
+Este procedimento usa `ws://` para teste em rede local confiável, sem autenticação.
+Não exponha esse modo à internet. A preparação de token e WSS está no
+[guia da Etapa 2](06-etapa-2.md).
 Verifique o servidor com `cargo test -p sinalizacao`.
 
 ## Mídia: uma escolha para chegar rápido ao experimento

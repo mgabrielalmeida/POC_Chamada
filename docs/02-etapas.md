@@ -41,9 +41,10 @@ Build, logs e testes automatizados não substituem essa aceitação.
 
 ## Etapa 2 — computadores em redes diferentes
 
-**Em implementação.** A preparação do cliente e da sinalização pode avançar
-localmente; a implantação depende de confirmar a máquina disponível, seu acesso
-administrativo e sua conectividade pública.
+**Em implementação.** Cliente com STUN/TURN configurável e diagnóstico ICE,
+sinalização com token opcional e guia de implantação preparados e verificados
+localmente. Implantação e aceitação dependem da máquina disponível, de seu acesso
+administrativo e de sua conectividade pública. Consulte o [guia da Etapa 2](06-etapa-2.md).
 
 1. Inspecionar a máquina disponível: sistema, administração e acesso pela internet.
 2. Disponibilizar sinalização com configuração explícita e acesso controlado.

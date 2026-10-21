@@ -150,3 +150,37 @@ A conclusão da Etapa 1 não comprova conectividade entre redes diferentes ou TU
   nos dois clientes, liberaram recursos e apresentaram `direto (local=host,
   remoto=host)` em ambos. Rodada 1: quadros `[5, 5]`, blocos PCM `[66, 69]`;
   rodada 2: quadros `[5, 14]`, blocos PCM `[83, 83]`. Sem captura real ou som.
+
+## Etapa 2 — acesso à sinalização e pacote Windows — 21/10/2026
+
+- `SINALIZACAO_TOKEN` habilita o controle de acesso antes da criação da sala;
+  o endereço padrão com token é loopback. Sem a variável, o modo LAN foi mantido.
+- `cargo test -p sinalizacao` encontrou o executável `target/debug/sinalizacao.exe`
+  em uso (`Acesso negado`). O processo existente foi preservado. A alternativa
+  `cargo test -p sinalizacao --target-dir target/verificacao-sinalizacao` passou:
+  quatro testes de integração com WebSockets reais em loopback, cobrindo os
+  fluxos LAN anteriores, rejeição de token ausente/incorreto, entrada e troca de
+  SDP autorizadas, limpeza e rejeição de configuração com token vazio.
+- Na repetição da suíte surgiu um reset TCP intermitente (`10054`) ao receber o
+  aviso `saiu` após negociação autorizada. O rastreamento localizou a falha no
+  encerramento da sala, não na verificação do token. O servidor agora reúne as
+  metades do WebSocket e aguarda o fechamento por até um segundo antes de soltar
+  o TCP; usa o mesmo cuidado nas rejeições de entrada. Após a correção, dez
+  execuções seguidas dos quatro testes de integração passaram (40 verificações).
+- A regressão sintética foi repetida com o encerramento corrigido: duas chamadas
+  passaram, com caminho direto nos dois clientes. Rodada 1: quadros `[7, 10]`,
+  PCM `[57, 56]`; rodada 2: quadros `[9, 9]`, PCM `[53, 53]`.
+- `cargo fmt --all -- --check` e `git diff --check`: aprovados na revisão final.
+- `cargo check --workspace`: aprovado para biblioteca cliente e servidor.
+- `flutter build windows --debug`: aprovado, com o pacote atualizado em
+  `app/build/windows/x64/runner/Debug/`. O aviso do linker sobre biblioteca de
+  importação permanece informativo; não houve erro de compilação.
+- O pacote foi compilado, sem nova execução visual, captura real ou aceitação
+  humana nesta rodada. A confirmação humana da Etapa 1 refere-se à versão anterior.
+- O guia da Etapa 2 registra configuração do cliente, token, proposta de proxy
+  Caddy/coturn, portas, NAT e roteiro de aceitação. São instruções preparadas,
+  não comandos executados na hospedagem. Nenhum serviço público foi exposto.
+- Pendentes: inspeção da máquina, escolha e registro das versões de Caddy/coturn,
+  implantação com certificado confiável, alcance público, áudio/vídeo entre redes
+  e ensaio de mídia com retransmissão forçada. TURN TCP/TLS segue fora do escopo
+  deste incremento; não há comprovação de funcionamento em redes que bloqueiem UDP.

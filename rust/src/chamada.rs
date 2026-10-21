@@ -337,8 +337,8 @@ async fn conectar(
             _ = vigilancia.tick() => {
                 recursos.midia.as_mut().unwrap().verificar_processos()?;
                 if conectada {
-                    if let Some(sender) = conexao.get_senders().await.first() {
-                        if let Some(transporte) = sender.transport().await? {
+                    if let Some(remetente) = conexao.get_senders().await.first() {
+                        if let Some(transporte) = remetente.transport().await? {
                             if let Some(par) = transporte.ice_transport().get_selected_candidate_pair().await? {
                                 let retransmitida = par.local().typ == RTCIceCandidateType::Relay || par.remote().typ == RTCIceCandidateType::Relay;
                                 let caminho = format!("Caminho ICE: {} (local={}, remoto={}).", if retransmitida { "retransmissão TURN" } else { "direto" }, par.local().typ, par.remote().typ);

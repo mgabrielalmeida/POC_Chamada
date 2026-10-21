@@ -74,3 +74,8 @@ Rust continua responsável pela rede; a interface apenas apresenta o tipo do
 caminho ICE realmente selecionado. Sem configuração, o comportamento LAN é
 preservado. A máquina pública segue indisponível para inspeção; não há implantação
 validada. O procedimento está no [guia da Etapa 2](06-etapa-2.md).
+
+A sinalização admite token compartilhado opcional, verificado antes de ocupar
+a sala. Com token, o servidor escuta em loopback por padrão para receber WSS
+através de um proxy na mesma máquina. A proposta de implantação é Caddy e coturn;
+a escolha e as versões da hospedagem dependem de sua inspeção.

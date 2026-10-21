@@ -82,3 +82,65 @@ async fn sala_invalida_e_mensagem_invalida_nao_deixam_participante_preso() {
     let _ = nova.close(None).await;
     servidor.abort();
 }
+
+#[tokio::test]
+async fn token_invalido_nao_ocupa_sala_e_token_valido_permite_negociar() {
+    let ouvinte = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let endereco = format!("ws://{}", ouvinte.local_addr().unwrap());
+    let servidor = tokio::spawn(sinalizacao::executar_com_token(
+        ouvinte,
+        Some("token-do-teste".into()),
+    ));
+    for token in [None, Some("incorreto")] {
+        let (mut cliente, _) = connect_async(&endereco).await.unwrap();
+        cliente
+            .send(Message::Text(
+                json!({"tipo":"entrar","sala":"restrita","token":token})
+                    .to_string()
+                    .into(),
+            ))
+            .await
+            .unwrap();
+        let resposta = receber(&mut cliente).await;
+        assert_eq!(resposta["tipo"], "erro");
+        assert_eq!(resposta["mensagem"], "Acesso não autorizado.");
+        let _ = cliente.close(None).await;
+    }
+    let mut clientes = Vec::new();
+    for _ in 0..2 {
+        let (mut cliente, _) = connect_async(&endereco).await.unwrap();
+        cliente
+            .send(Message::Text(
+                json!({"tipo":"entrar","sala":"restrita","token":"token-do-teste"})
+                    .to_string()
+                    .into(),
+            ))
+            .await
+            .unwrap();
+        clientes.push(cliente);
+        if clientes.len() == 1 {
+            assert_eq!(receber(&mut clientes[0]).await["tipo"], "aguardando");
+        }
+    }
+    assert_eq!(receber(&mut clientes[0]).await["ofertante"], true);
+    assert_eq!(receber(&mut clientes[1]).await["ofertante"], false);
+    let oferta = json!({"tipo":"descricao","descricao":{"type":"offer","sdp":"teste autorizado"}});
+    clientes[0]
+        .send(Message::Text(oferta.to_string().into()))
+        .await
+        .unwrap();
+    assert_eq!(receber(&mut clientes[1]).await, oferta);
+    clientes[0].close(None).await.unwrap();
+    assert_eq!(receber(&mut clientes[1]).await["tipo"], "saiu");
+    servidor.abort();
+}
+
+#[tokio::test]
+async fn token_vazio_nao_desativa_protecao_silenciosamente() {
+    let ouvinte = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    assert!(
+        sinalizacao::executar_com_token(ouvinte, Some(" ".into()))
+            .await
+            .is_err()
+    );
+}
