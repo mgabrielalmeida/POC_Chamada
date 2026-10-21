@@ -10,3 +10,10 @@ add_custom_target(chamada_rust ALL
 add_dependencies(${BINARY_NAME} chamada_rust)
 install(FILES "${CHAMADA_RAIZ}/target/${CHAMADA_SAIDA}/chamada.dll"
   DESTINATION "${INSTALL_BUNDLE_LIB_DIR}" COMPONENT Runtime)
+
+# A preparação baixa e confere uma versão fixa. O pacote preserva sua licença.
+set(CHAMADA_FFMPEG "${CHAMADA_RAIZ}/.local/ffmpeg-9.0.2-essentials_build")
+install(FILES "${CHAMADA_FFMPEG}/bin/ffmpeg.exe" "${CHAMADA_FFMPEG}/bin/ffplay.exe"
+  DESTINATION "${INSTALL_BUNDLE_LIB_DIR}" COMPONENT Runtime)
+install(FILES "${CHAMADA_FFMPEG}/LICENSE" "${CHAMADA_FFMPEG}/README.txt"
+  DESTINATION "${INSTALL_BUNDLE_LIB_DIR}/licencas/ffmpeg" COMPONENT Runtime)

@@ -7,6 +7,50 @@ import 'frb_generated.dart';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
+// These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `Sessao`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `fmt`
+
+/// Há uma janela e um assinante por processo nesta POC.
+Stream<EventoChamada> observarChamada() =>
+    RustLib.instance.api.crateApiObservarChamada();
+
+/// Solta o sink Rust antes de cancelar a assinatura Dart, fechando o stream.
+Future<void> encerrarObservacao() =>
+    RustLib.instance.api.crateApiEncerrarObservacao();
+
+/// A função apenas inicia a sessão; estados e vídeo retornam pelo stream.
+Future<void> iniciarChamada({required String endereco, required String sala}) =>
+    RustLib.instance.api.crateApiIniciarChamada(endereco: endereco, sala: sala);
+
+/// Só retorna depois de fechar WebRTC e esperar os processos de mídia terminarem.
+Future<void> encerrarChamada() =>
+    RustLib.instance.api.crateApiEncerrarChamada();
+
 /// Confirma que a interface chamou a biblioteca nativa, sem abrir dispositivos.
 Future<String> verificarPonte() =>
     RustLib.instance.api.crateApiVerificarPonte();
+
+/// Os quadros são RGBA de 320×240. Eventos de estado têm `rgba` vazio.
+class EventoChamada {
+  final String tipo;
+  final String texto;
+  final Uint8List rgba;
+
+  const EventoChamada({
+    required this.tipo,
+    required this.texto,
+    required this.rgba,
+  });
+
+  @override
+  int get hashCode => tipo.hashCode ^ texto.hashCode ^ rgba.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is EventoChamada &&
+          runtimeType == other.runtimeType &&
+          tipo == other.tipo &&
+          texto == other.texto &&
+          rgba == other.rgba;
+}

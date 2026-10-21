@@ -4,4 +4,6 @@
 //! A interface Flutter apenas encaminhará ações e apresentará resultados.
 
 pub mod api;
+pub mod chamada;
 mod frb_generated;
+pub mod midia;

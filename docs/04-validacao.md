@@ -38,7 +38,7 @@ Executável gerado: `app/build/windows/x64/runner/Debug/poc_chamada.exe`.
 Saídas de compilação ficam fora do Git. Os lockfiles Flutter e Rust são versionados.
 A formatação Dart também precisou de acesso ao cache local da ferramenta.
 
-## Limites
+## Limites da base inicial, antes da Etapa 1
 
 - Flutter-Rust Bridge e webrtc-rs ainda não estão instalados ou integrados.
 - Nenhuma captura, reprodução, conexão de sinalização ou chamada foi testada.
@@ -63,3 +63,43 @@ A formatação Dart também precisou de acesso ao cache local da ferramenta.
 - Cobertos: papéis oferta/resposta, encaminhamento de SDP, sala lotada, nome
   inválido, mensagem malformada, aviso de saída e reutilização da sala.
 - Estes testes não comprovam acesso pela LAN, firewall ou mídia.
+
+## Etapa 1 — mídia e WebRTC
+
+- Fixados FRB 2.13.0, `webrtc`/`rtc` 0.21.1 e FFmpeg 9.0.2 essentials.
+- `scripts/preparar-midia.ps1`: SHA256 conferido e preparação reproduzida.
+- `cargo check -p chamada`: integração com webrtc-rs compilada.
+- `cargo test -p chamada --test chamada_sintetica -- --ignored --nocapture`:
+  duas sessões reais em loopback trocaram mídia VP8/Opus, decodificaram vídeo e
+  áudio PCM dos dois lados, encerraram e repetiram a chamada. O teste exige pelo
+  menos cinco quadros e cinco blocos PCM remotos em cada sessão, em cada rodada.
+- O teste inicial revelou um aviso de porta RTP/RTCP local e erros iniciais de
+  decodificação. Foram reservados pares de portas, separadas as portas de saída
+  do encoder e preservados os primeiros quadros de entrada. A repetição passou
+  sem esses avisos. O envio filtra pacotes que não sejam VP8/Opus RTP.
+- `cargo run -p chamada --example diagnosticar_midia`: câmera real retornou
+  307.200 bytes RGBA (320×240×4) e microfone real retornou um pacote RTP Opus
+  válido com 44 bytes de payload. Os helpers foram encerrados ao terminar.
+- Dispositivos observados: ACER HD User Facing e Microphone Array (AMD Audio Device).
+- `dart run tool/verificar_ponte.dart`: confirmou a chamada simples, o stream,
+  a propagação de erro Rust e o encerramento sem abrir dispositivos.
+- A verificação adicional encontrou um sink Rust mantendo o stream aberto no
+  cancelamento Dart. Foi incluído `encerrar_observacao`, chamado antes de cancelar
+  a assinatura. O utilitário passou e terminou após a correção.
+
+## Limites atuais da Etapa 1
+
+- Pendente: chamada de cinco minutos em dois computadores físicos na mesma rede,
+  qualidade audível/visual, encerramento e nova chamada nesse cenário.
+- O teste sintético decodifica PCM sem tocar som. Ele não comprova a reprodução
+  audível pelo FFplay nem a escolha correta da saída de áudio em outro computador.
+- O diagnóstico de captura comprova leitura local, sem avaliar qualidade humana.
+- Build Release, distribuição e execução no segundo PC ainda não foram validados.
+- A proteção de helpers via Job Object está configurada e compilada; encerramento
+  forçado pelo gerenciador de tarefas não foi ensaiado como teste separado.
+- Firewall, alcance LAN e a máquina da Etapa 2 ainda precisam de verificação real.
+- Os avisos de linker observados apenas informam a criação da biblioteca de
+  importação Windows; não impediram a compilação.
+
+A implementação não encerra a aceitação da etapa. Registre aqui os resultados
+dos dois dispositivos antes de considerar o objetivo 1 concluído.
