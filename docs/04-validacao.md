@@ -87,6 +87,20 @@ A formatação Dart também precisou de acesso ao cache local da ferramenta.
   cancelamento Dart. Foi incluído `encerrar_observacao`, chamado antes de cancelar
   a assinatura. O utilitário passou e terminou após a correção.
 
+## Etapa 1 — interface e pacote Windows
+
+- Interface mínima com servidor, sala, criar/entrar, encerrar e vídeos local/remoto.
+- `flutter analyze`: nenhum problema encontrado na versão final.
+- `cargo fmt --all -- --check` e `git diff --check`: aprovados.
+- `flutter build windows --debug`: aprovado na versão final. Executável em
+  `app/build/windows/x64/runner/Debug/poc_chamada.exe`, acompanhado de `chamada.dll`,
+  FFmpeg, FFplay e licença FFmpeg copiada integralmente.
+- Um build intermediário não conseguiu sobrescrever a DLL porque o utilitário
+  Dart de verificação ainda a mantinha carregada. Após corrigir o fechamento do
+  stream e finalizar o utilitário, o build foi repetido com sucesso. Não execute
+  esse utilitário ao mesmo tempo que compila a DLL no Windows.
+- Não foi feita inspeção visual da janela nem aceitação humana de áudio/vídeo.
+
 ## Limites atuais da Etapa 1
 
 - Pendente: chamada de cinco minutos em dois computadores físicos na mesma rede,

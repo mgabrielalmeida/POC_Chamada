@@ -11,6 +11,10 @@ Esta entrega não representa uma chamada ou integração entre linguagens.
 
 ## Etapa 1 — dois computadores na mesma rede
 
+Ponte e sinalização implementadas. A integração de mídia e sua verificação estão
+registradas em [validação](04-validacao.md); a aceitação humana abaixo permanece
+obrigatória antes de considerar a etapa concluída.
+
 Ordem de trabalho sugerida:
 
 1. Integrar Flutter-Rust Bridge e comprovar uma chamada simples Dart → Rust.

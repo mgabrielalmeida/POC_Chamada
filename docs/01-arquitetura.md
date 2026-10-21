@@ -11,8 +11,9 @@
 | Servidor Rust | Reunir duas pessoas em uma sala e encaminhar a negociação. |
 | TURN próprio | Retransmitir mídia quando necessário na etapa entre redes diferentes. |
 
-Esta tabela define a arquitetura pretendida. Na base inicial, somente os pontos
-de entrada Flutter e Rust existem; as integrações ainda serão implementadas.
+Na Etapa 1, Flutter-Rust Bridge conecta a interface à biblioteca nativa. O cliente
+usa `webrtc` 0.21.1 e seus tipos de protocolo `rtc` 0.21.1. FFmpeg 9.0.2 fornece
+captura e codecs como dependência auxiliar, sempre iniciada e encerrada por Rust.
 
 ## Caminho de uma chamada
 
@@ -35,10 +36,10 @@ na camada Rust. A POC não deve considerar a escolha de WebRTC como implementaç
 concluída dessas funções. Bibliotecas auxiliares são permitidas se preservarem
 essa divisão de responsabilidades.
 
-O próximo trabalho técnico deve comprovar cedo um caminho mínimo de mídia no
-Windows e registrar codecs, bibliotecas nativas, versões e comandos necessários.
-Ainda não há escolha de codec, resolução exata ou bibliotecas de captura. Evite
-adicionar dependências antes de verificar o caminho que elas precisam atender.
+O vídeo usa VP8, 320×240 e 10 quadros por segundo; áudio usa Opus, 48 kHz e dois
+canais. O caminho detalhado está no guia da Etapa 1. Usamos a primeira câmera e
+o primeiro microfone enumerados por DirectShow, sem seleção na tela. Isso pode
+diferir do microfone preferido nas configurações do Windows.
 
 ## Escopo fechado
 

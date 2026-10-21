@@ -5,14 +5,14 @@ O objetivo é avaliar `webrtc-rs` para um aplicativo maior, mantendo esta POC
 pequena, legível e rápida de implementar.
 
 Flutter apresenta a interface. Rust concentra mídia, rede e controle da chamada.
-Flutter-Rust Bridge fará a comunicação entre essas camadas.
+Flutter-Rust Bridge faz a comunicação entre essas camadas.
 
 ## Estado atual
 
-Base inicial: aplicativo Flutter Windows com tela estática, biblioteca Rust e
-executável Rust de sinalização. **Ainda não há ponte Flutter–Rust, captura de
-mídia, webrtc-rs integrado, servidor escutando ou chamada funcional.** As versões
-dessas dependências serão escolhidas e registradas quando forem integradas.
+Implementação da Etapa 1 disponível: ponte Flutter–Rust, sinalização por salas e caminho
+de áudio e vídeo com `webrtc-rs`. A mídia usa FFmpeg auxiliar, controlado por Rust.
+Os resultados e limites estão em [ambiente e validação](docs/04-validacao.md).
+A aceitação da chamada requer dois computadores físicos.
 
 ## Estrutura
 
@@ -22,7 +22,7 @@ dessas dependências serão escolhidas e registradas quando forem integradas.
 - `docs/`: arquitetura, etapas, guia do código e evidências de validação.
 - `Cargo.toml` e `Cargo.lock`: workspace Rust compartilhado.
 
-## Preparar e executar a base
+## Preparar e executar
 
 Use PowerShell na raiz do repositório. São necessários Flutter com suporte a
 Windows, Rust com toolchain MSVC e Visual Studio Build Tools com as ferramentas
@@ -36,7 +36,15 @@ rustc --version
 cargo --version
 ```
 
-Para abrir a tela inicial:
+Na raiz, prepare a mídia e inicie a sinalização em um dos computadores:
+
+```powershell
+.\scripts\preparar-midia.ps1
+cargo run -p sinalizacao
+```
+
+Em outro terminal, abra o aplicativo. Repita a preparação e a abertura do
+aplicativo no segundo computador:
 
 ```powershell
 cd app
@@ -44,16 +52,11 @@ flutter pub get
 flutter run -d windows
 ```
 
-Em outro terminal, na raiz, para conferir os esqueletos Rust:
-
-```powershell
-cargo check --workspace
-cargo run -p sinalizacao
-```
-
-O último comando apenas informa que o servidor ainda não foi implementado e
-encerra. A tela Flutter funciona independentemente da biblioteca Rust nesta base.
-Não há configuração de sala, endereço ou credenciais nesta etapa.
+Em ambos os aplicativos, informe `ws://IP_DO_SERVIDOR:8080` e o mesmo nome de sala.
+Clique em **Criar / entrar**. A primeira pessoa aguarda a segunda. Use **Encerrar**
+antes de iniciar outra chamada. Para os dois PCs, o IP deve ser o IPv4 LAN do
+servidor, não `127.0.0.1`. Consulte o [guia da Etapa 1](docs/05-etapa-1.md) para
+firewall, distribuição e diagnósticos. Esta etapa usa rede local confiável.
 
 ## Verificar mudanças
 
@@ -62,17 +65,18 @@ Na raiz:
 ```powershell
 cargo fmt --all -- --check
 cargo check --workspace
+cargo test -p sinalizacao
 ```
 
 Na pasta `app/`:
 
 ```powershell
-dart format --output=none --set-exit-if-changed lib
+dart format --output=none --set-exit-if-changed lib tool
 flutter analyze
 flutter build windows --debug
 ```
 
-Esses comandos verificam a base. A aceitação da chamada exigirá dois computadores
+Esses comandos verificam compilação e análise. A aceitação da chamada exigirá dois computadores
 físicos e observação humana, conforme o [plano](docs/02-etapas.md).
 
 ## Solução de problemas
@@ -85,7 +89,11 @@ físicos e observação humana, conforme o [plano](docs/02-etapas.md).
   e instale os componentes C++ de desktop e Windows SDK indicados.
 - **Plugins exigem links simbólicos:** habilite o Modo de Desenvolvedor do Windows
   e execute novamente a preparação do aplicativo.
-- **A tela abre, mas não faz chamadas:** esse é o comportamento desta base inicial.
+- **A outra pessoa não entra:** confira o IP LAN, a mesma sala, o servidor ativo
+  e a liberação de TCP 8080 no firewall da rede privada.
+- **Conecta mas não chega mídia:** confira permissões de câmera/microfone e
+  liberação do aplicativo no firewall para UDP na rede privada.
+- **FFmpeg ausente:** execute `scripts/preparar-midia.ps1` antes de compilar.
 
 Problemas reais de mídia e rede serão documentados à medida que forem observados.
 
@@ -95,6 +103,7 @@ Problemas reais de mídia e rede serão documentados à medida que forem observa
 - [Etapas e critérios de conclusão](docs/02-etapas.md)
 - [Guia didático do código](docs/03-guia-do-codigo.md)
 - [Ambiente e validação](docs/04-validacao.md)
+- [Execução e explicação da Etapa 1](docs/05-etapa-1.md)
 
 O Git é local, com branch `main`, sem publicação remota. Use commits pequenos e
 coerentes. Versione os lockfiles; não versione saídas de compilação, segredos ou
