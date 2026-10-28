@@ -184,28 +184,32 @@ class _TelaChamadaState extends State<TelaChamada> {
     await _assinatura?.cancel();
   }
 
-  Widget _video(String titulo, ui.Image? imagem) => Expanded(
-    child: Column(
-      children: [
-        Text(titulo),
-        const SizedBox(height: 8),
-        Expanded(
-          child: Container(
-            width: double.infinity,
-            color: Colors.black,
-            child: imagem == null
-                ? const Center(
-                    child: Text(
-                      'Aguardando vídeo',
-                      style: TextStyle(color: Colors.white),
-                    ),
-                  )
-                : RawImage(image: imagem, fit: BoxFit.contain),
-          ),
+  Widget _video(String titulo, ui.Image? imagem, {bool espelhar = false}) =>
+      Expanded(
+        child: Column(
+          children: [
+            Text(titulo),
+            const SizedBox(height: 8),
+            Expanded(
+              child: Container(
+                width: double.infinity,
+                color: Colors.black,
+                child: imagem == null
+                    ? const Center(
+                        child: Text(
+                          'Aguardando vídeo',
+                          style: TextStyle(color: Colors.white),
+                        ),
+                      )
+                    : Transform.flip(
+                        flipX: espelhar,
+                        child: RawImage(image: imagem, fit: BoxFit.contain),
+                      ),
+              ),
+            ),
+          ],
         ),
-      ],
-    ),
-  );
+      );
 
   @override
   Widget build(BuildContext context) => Scaffold(
@@ -256,7 +260,7 @@ class _TelaChamadaState extends State<TelaChamada> {
           Expanded(
             child: Row(
               children: [
-                _video('Seu vídeo', _local),
+                _video('Seu vídeo', _local, espelhar: true),
                 const SizedBox(width: 16),
                 _video('Outra pessoa', _remoto),
               ],

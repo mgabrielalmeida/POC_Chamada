@@ -10,7 +10,7 @@ use webrtc::peer_connection::{
 pub(crate) struct Rede {
     pub token_sinalizacao: String,
     servidores_ice: Vec<ServidorIce>,
-    somente_retransmissao: bool,
+    pub somente_retransmissao: bool,
 }
 
 #[derive(Deserialize)]
@@ -24,7 +24,7 @@ struct ServidorIce {
 }
 
 impl Rede {
-    /// Sem variável, mantém exatamente a configuração LAN da Etapa 1.
+    /// Sem variável, mantém a LAN sem exigir serviços externos.
     pub fn carregar() -> Result<Self> {
         let Some(caminho) = std::env::var_os("CHAMADA_CONFIG") else {
             return Ok(Self::default());
@@ -66,8 +66,19 @@ impl Rede {
             };
             // A biblioteca valida host, porta e credenciais; não expomos o erro
             // original porque a configuração contém segredos locais.
-            if servidor.urls().is_err() {
-                bail!("Servidor ICE inválido. Confira URL, usuário e senha TURN");
+            let urls = servidor.urls().map_err(|_| {
+                anyhow::anyhow!("Servidor ICE inválido. Confira URL, usuário e senha TURN")
+            })?;
+            // webrtc 0.21.1 remonta o endpoint TURN como host:porta sem recolocar
+            // os colchetes de um literal IPv6. DNS com AAAA funciona e é o caminho
+            // usado na implantação; falhar aqui evita uma coleta silenciosamente vazia.
+            if urls
+                .iter()
+                .any(|url| url.scheme == rtc::ice::url::SchemeType::Turn && url.host.contains(':'))
+            {
+                bail!(
+                    "TURN IPv6 exige hostname com registro AAAA nesta versão; não use IPv6 literal na URL TURN"
+                );
             }
             servidores.push(servidor);
         }
@@ -151,5 +162,26 @@ mod testes {
                 .is_err()
         );
         assert!(rede.validar_sinalizacao("https://exemplo.org").is_err());
+    }
+
+    #[test]
+    fn sinalizacao_ipv6_preserva_regras_de_tls_e_token() {
+        let rede = Rede::ler(r#"{"token_sinalizacao":"teste"}"#).unwrap();
+        rede.validar_sinalizacao("ws://[::1]:8080").unwrap();
+        rede.validar_sinalizacao("wss://[2001:db8::1]:443").unwrap();
+        rede.validar_sinalizacao("wss://chamada.exemplo.org")
+            .unwrap();
+        assert!(rede.validar_sinalizacao("ws://[2001:db8::1]:8080").is_err());
+        assert!(rede.validar_sinalizacao("wss://[2001:db8::1").is_err());
+    }
+
+    #[test]
+    fn ice_aceita_dns_aaaa_e_stun_ipv6_mas_explica_limite_do_turn_literal() {
+        let rede = Rede::ler(r#"{"servidores_ice":[{"urls":["stun:[2001:db8::1]:3478","turn:chamada.exemplo.org:3478?transport=udp"],"usuario":"teste","senha":"segredo"}]}"#).unwrap();
+        rede.configuracao_ice().unwrap();
+        let rede = Rede::ler(r#"{"servidores_ice":[{"urls":["turn:[2001:db8::1]:3478?transport=udp"],"usuario":"teste","senha":"segredo"}]}"#).unwrap();
+        let erro = rede.configuracao_ice().unwrap_err().to_string();
+        assert!(erro.contains("AAAA"));
+        assert!(!erro.contains("segredo"));
     }
 }

@@ -1,5 +1,12 @@
 # Ambiente e validação
 
+[Desenvolvimento](README.md) · [Procedimentos de teste](testes.md)
+
+Este é um histórico: cada seção descreve o estado da sua rodada, inclusive
+pendências que podem ter avançado depois. O registro posterior à auditoria
+IPv6 está em [diagnóstico da primeira chamada](diagnostico-primeira-chamada.md).
+Reorganizar os documentos em 27/10/2026 não reexecutou essas verificações.
+
 ## Base inicial — 21/10/2026
 
 Ferramentas observadas nesta máquina:
@@ -184,3 +191,145 @@ A conclusão da Etapa 1 não comprova conectividade entre redes diferentes ou TU
   implantação com certificado confiável, alcance público, áudio/vídeo entre redes
   e ensaio de mídia com retransmissão forçada. TURN TCP/TLS segue fora do escopo
   deste incremento; não há comprovação de funcionamento em redes que bloqueiem UDP.
+
+## Revisão da abordagem de hospedagem — 22/10/2026
+
+- O responsável substituiu o cenário Ubuntu remoto com VPN por um terceiro
+  computador Windows doméstico, com IP privado e acesso ao roteador. Confirmou
+  que os dois participantes acessarão pela internet, sem VPN.
+- A documentação propõe sinalização Rust e Caddy nativos no terceiro Windows,
+  além de coturn Windows com referência 4.18.0 e MSVC/vcpkg. O roteiro detalha
+  verificação de CGNAT/duplo NAT, reserva DHCP, DNS/DDNS, regras TCP/UDP e WSS.
+- O fluxo de compilação TURN foi conferido na fonte upstream da versão; não
+  foi executado neste projeto. A configuração evita as opções `no-cli` e
+  `no-dtls`, removidas nessa versão.
+- Nesta revisão foram alterados apenas documentos. Não houve acesso ao terceiro
+  Windows, alteração de roteador, compilação de dependências, emissão de
+  certificado ou chamada externa. As evidências históricas acima permanecem.
+- Pendentes: confirmar entrada IPv4 da residência, compilar/executar o pacote
+  TURN Windows, implantar e verificar serviços e portas, executar os dois ensaios
+  de chamada e conferir a inicialização após reboot caso seja configurada.
+
+## Auditoria e adaptação IPv6 — 23/10/2026
+
+Esta seção atualiza o estado da Etapa 2 e **não reescreve os testes anteriores**.
+A entrada IPv4 ficou inviável sob CGNAT conforme investigação do responsável.
+A topologia atual usa IPv6 global do Windows S, DNS AAAA, Caddy/WSS público e
+coturn 4.18.0 nativo, sem VPN. Os IPs informados são observações daquela rede,
+não constantes incorporadas ao projeto.
+
+### Investigação e mudanças
+
+- O caminho Flutter→FRB→Rust, o parser WSS, a sinalização/salas e os helpers
+  locais já eram compatíveis com a separação de famílias. Foram preservados.
+- O bind WebRTC restringia mídia a IPv4. Foi ampliado para wildcards IPv4/IPv6;
+  a biblioteca expande cada um nas interfaces utilizáveis daquela família.
+- A inspeção dos fontes locais fixados confirmou DNS IPv6 no runtime ICE,
+  combinação de endereços da mesma família e suporte a candidatos host/srflx/relay.
+  Não foi deduzido suporte completo a partir do nome da biblioteca.
+- rtc-turn 0.21.1 não envia REQUESTED-ADDRESS-FAMILY. O coturn dedicado deve usar
+  `allocation-default-address-family=ipv6`, opção conferida no parser 4.18.0.
+- TURN IPv6 literal sofre reconstrução sem colchetes no webrtc 0.21.1. A validação
+  agora o rejeita antecipadamente com orientação para hostname AAAA. Não há fork
+  da biblioteca nem alteração do formato JSON ou das dependências do projeto.
+- O diagnóstico do par selecionado agora inclui tipo, protocolo, família, IP e
+  porta em ambos os candidatos. Os endereços ficam no diagnóstico local.
+- Criados exemplos Caddy/coturn IPv6, reescrito integralmente o roteiro 07 e
+  alinhados README, arquitetura, etapas, guia e contratos. Roteiro/relatório
+  diferenciam configuração, compilação, transporte local e aceitação física.
+
+### Resultados executados
+
+| Verificação | Resultado e alcance |
+| --- | --- |
+| `cargo test --locked --workspace` | 14 testes aprovados: seis de configuração, três IPv6 e cinco de sinalização; dois ignorados por pré-requisitos próprios |
+| Teste de parsing/regras IPv6 | WSS/literal com colchetes, loopback sem TLS, exigência TLS/token, STUN literal e rejeição explicada do TURN literal |
+| Resolução ICE | Runtime da biblioteca retornou IPv6 para localhost; não é consulta AAAA pública |
+| STUN UDP IPv6 | Servidor de teste com mensagens da biblioteca produziu candidato srflx IPv6 no SDP; endereço de documentação controlado, não observação de NAT |
+| RTP IPv6 | Duas PeerConnections em ::1 negociaram trilhas VP8/Opus, receberam payloads conhecidos nas duas trilhas de ambos os lados, exigiram par host↔host IPv6 e repetiram após fechar |
+| Sinalização IPv6 | WebSocket real em ::1, rejeição de token ausente/incorreto e negociação autorizada sem ocupar sala indevidamente |
+| `cargo test --locked -p chamada --test chamada_sintetica -- --ignored --nocapture` | Aprovado: duas chamadas no caminho completo da aplicação com vídeo/áudio gerados e decodificados |
+| `cargo fmt --all -- --check` | Aprovado |
+| `cargo check --locked --workspace` | Aprovado |
+| `cargo build --locked -p sinalizacao --release` | Aprovado |
+| Inicialização da sinalização Release | Executável iniciou com token em 127.0.0.1:0 e [::1]:0; processos de teste encerrados |
+| `cargo clippy --locked --workspace --all-targets` | Concluído com avisos de estilo preexistentes; ver observação abaixo |
+| `dart format --output=none --set-exit-if-changed lib tool` | Cinco arquivos, nenhuma alteração |
+| `dart run tool/verificar_ponte.dart` | Ponte, stream, erro assíncrono e encerramento aprovados com DLL atualizada |
+| `flutter analyze` | Nenhum problema encontrado |
+| `flutter build windows --release` | Aprovado; pacote completo em app/build/windows/x64/runner/Release |
+| `git diff --check` | Sem erros de espaços em branco; Git informa conversão de fins de linha conforme atributos |
+| Comandos da documentação | 39 blocos PowerShell analisados pelo parser, sem erro sintático; não executados |
+| Links da documentação | Referências locais conferidas, nenhum destino ausente |
+
+Na regressão sintética, o caminho escolhido continuou **host IPv4** nos dois
+clientes. Rodada 1: quadros remotos `[11, 12]`, blocos PCM `[69, 69]`.
+Rodada 2: quadros `[12, 11]`, PCM `[70, 68]`. Isso comprova regressão de mídia
+local com o novo bind duplo, não decodificação audiovisual por IPv6 público.
+O ensaio ::1 comprova transporte RTP por ICE/DTLS/SRTP IPv6, mas usa payloads
+conhecidos; não mede qualidade nem produz som ou frames decodificados.
+
+Clippy não estava instalado; o componente foi adicionado à toolchain usada na
+verificação. A execução estrita inicial com `-D clippy::all` falhou em avisos
+preexistentes de `collapsible_if`/`needless_update` em sinalização, chamada e
+exemplo de captura. Eles foram preservados para evitar refatorações de código
+compatível fora do escopo. Os dois avisos encontrados no teste novo foram
+corrigidos e o teste foi repetido. A execução normal do Clippy concluiu; isso
+não equivale a uma execução estrita sem avisos.
+
+As primeiras execuções dos testes IPv6 expiraram sob a restrição de rede do
+sandbox. Até uma troca UDP simples em ::1 expirou nesse ambiente. A mesma suíte
+passou fora dessa restrição, sem alterar firewall real. Houve também uma falha
+inicial de compilação por importação de trait no teste e correção do SSRC do
+payload para o negociado; a versão final foi reexecutada com sucesso.
+
+Flutter 3.47.6, Dart 3.13.5, Rust/Cargo 1.98.1 e alvo windows-x64 foram conferidos.
+Doctor reconheceu Build Tools 2026/SDK Windows e indicou pendências Android/Chrome,
+alvos fora do escopo. O SDK Flutter exigiu escrita no lock/cache fora do workspace;
+a verificação foi repetida com esse acesso e passou. Avisos de linker sobre
+biblioteca de importação e de cache incremental por cópia não impediram builds.
+
+### Pendências e limites mantidos
+
+- Coturn 4.18.0 nativo não foi compilado/executado nesta rodada. A release oficial
+  consultada oferece fontes/atestado, sem pacote Windows pronto nos assets; o
+  roteiro preserva build MSVC/vcpkg upstream. O teste TURN real de ipv6.rs está
+  preparado e ignorado até existir processo coturn de teste isolado.
+- O padrão de alocação IPv6 no coturn foi conferido em fonte, **não comprovado
+  por alocação/relay real** neste ambiente. TURN UDP via hostname AAAA foi
+  auditado, mas não exercitado externamente. TURN TCP/TLS segue fora da integração.
+- Caddy/configuração foram documentados a partir de fontes oficiais; não houve
+  instalação de Caddy em S, validação do Caddyfile com seu executável, emissão
+  ACME, publicação AAAA, atualização DDNS nem mudança de firewall/roteador.
+- O firmware FGA2110 real permanece por conferir. Não se presume suporte a menus
+  ou regras específicas que não tenham sido inspecionados.
+- Seguem pendentes os cinco cenários físicos: WSS IPv6 autenticado de A/B externos,
+  mídia normal, mídia TURN forçado com relay↔relay IPv6/contadores, cinco minutos
+  em cada modo e encerramento/repetição sem reiniciar serviços de S.
+- Redes somente IPv4 não alcançam o serviço somente IPv6. Os três computadores
+  precisam das condições de conectividade descritas no roteiro.
+- Nenhuma aceitação visual, qualidade audível, captura real ou teste entre redes
+  foi declarado nesta rodada. Nenhum commit foi realizado.
+
+Consultar [auditoria](auditoria-ipv6.md) e [roteiro operacional](roteiro-entre-redes.md).
+
+O diagnóstico e as correções após a primeira tentativa humana pela internet
+estão no [registro da chamada](diagnostico-primeira-chamada.md).
+
+## Reorganização documental — 27/10/2026
+
+- Separados os procedimentos e registros em `docs/desenvolvimento/` e os
+  estudos em `docs/estudos/`, com índice geral e mapa dos caminhos anteriores.
+- Estudos divididos em arquitetura, WebRTC, mídia, servidor, ponte Flutter–Rust,
+  Flutter e infraestrutura. Cada módulo relaciona funcionamento e arquivos.
+- O módulo WebRTC explica a API 0.21.1, negociação, transporte RTP, candidatos,
+  cancelamento, limitações confirmadas e soluções usadas na POC.
+- Explicações conferidas com o código local, manifestos e testes. Os dois
+  contornos TURN IPv6 foram reconferidos nos fontes locais de webrtc/rtc-turn
+  0.21.1; a documentação pública dessa versão foi consultada para a arquitetura
+  da biblioteca. Não houve atualização de dependências.
+- Links locais, fechamento de blocos Markdown e sintaxe dos blocos PowerShell
+  foram verificados. Os comandos documentados não foram executados nesta revisão.
+- Nenhuma nova execução de build, chamada, captura real ou ensaio de rede foi
+  realizada para esta mudança de documentação. Os critérios de aceite e os
+  resultados históricos permanecem distintos dessa conferência documental.

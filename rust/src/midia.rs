@@ -2,9 +2,11 @@
 //! O RTP nestes sockets fica restrito ao loopback; a rede entre PCs usa webrtc-rs.
 use anyhow::{Context, Result, bail};
 use std::{
+    collections::VecDeque,
     net::{SocketAddr, UdpSocket as SocketPadrao},
     path::PathBuf,
     process::Stdio,
+    sync::{Arc, Mutex},
 };
 use tempfile::TempDir;
 use tokio::{
@@ -92,11 +94,19 @@ pub struct Midia {
     pub destino_video: SocketAddr,
     pub destino_audio: SocketAddr,
     _rtcp_captura: Vec<SocketPadrao>,
-    filhos: Vec<Child>,
+    filhos: Vec<ProcessoMidia>,
     tarefas: JoinSet<()>,
     _temporarios: TempDir,
     #[cfg(windows)]
     trabalho: TrabalhoWindows,
+}
+
+/// Cada falha identifica o helper e preserva stderr mesmo quando o canal de
+/// quadros está cheio durante a negociação. O histórico tem tamanho limitado.
+struct ProcessoMidia {
+    nome: &'static str,
+    filho: Child,
+    diagnostico: Arc<Mutex<VecDeque<String>>>,
 }
 
 /// Localiza binários junto ao aplicativo ou no diretório de desenvolvimento.
@@ -238,6 +248,10 @@ impl Midia {
                 "file,udp,rtp",
                 "-localaddr",
                 "127.0.0.1",
+                // O padrão SDP de 10 s expira antes da negociação ICE na internet.
+                // Rust continua controlando cancelamento e prazo da conexão.
+                "-listen_timeout",
+                "120",
                 "-flags",
                 "low_delay",
                 "-analyzeduration",
@@ -264,7 +278,12 @@ impl Midia {
             .stdout(Stdio::piped());
         drop((reserva_v, reserva_v_rtcp));
         midia
-            .adicionar(decodificador, Some(false), eventos.clone())
+            .adicionar(
+                "receptor de vídeo",
+                decodificador,
+                Some(false),
+                eventos.clone(),
+            )
             .await?;
 
         let mut reprodutor = comando(if sintetica {
@@ -280,6 +299,8 @@ impl Midia {
             "file,udp,rtp",
             "-localaddr",
             "127.0.0.1",
+            "-listen_timeout",
+            "120",
             "-analyzeduration",
             "100000",
             "-probesize",
@@ -307,9 +328,12 @@ impl Midia {
         }
         drop((reserva_a, reserva_a_rtcp));
         let indice_audio = midia.filhos.len();
-        midia.adicionar(reprodutor, None, eventos.clone()).await?;
+        midia
+            .adicionar("receptor de áudio", reprodutor, None, eventos.clone())
+            .await?;
         if sintetica {
             let mut pcm = midia.filhos[indice_audio]
+                .filho
                 .stdout
                 .take()
                 .context("Saída PCM ausente")?;
@@ -377,7 +401,9 @@ impl Midia {
                 midia.video.local_addr()?
             ))
             .stdout(Stdio::piped());
-        midia.adicionar(camera, Some(true), eventos.clone()).await?;
+        midia
+            .adicionar("câmera", camera, Some(true), eventos.clone())
+            .await?;
 
         let mut microfone = comando("ffmpeg.exe")?;
         microfone.args(["-hide_banner", "-loglevel", "error", "-nostdin"]);
@@ -418,19 +444,22 @@ impl Midia {
                 "rtp://{}?pkt_size=1200&localaddr=127.0.0.1&localrtpport=0&localrtcpport=0",
                 midia.audio.local_addr()?
             ));
-        midia.adicionar(microfone, None, eventos).await?;
+        midia
+            .adicionar("microfone", microfone, None, eventos)
+            .await?;
         Ok(midia)
     }
 
     async fn adicionar(
         &mut self,
+        nome: &'static str,
         mut comando: Command,
         video_local: Option<bool>,
         eventos: mpsc::Sender<EventoMidia>,
     ) -> Result<()> {
         let mut filho = comando
             .spawn()
-            .context("Não foi possível iniciar o helper de mídia")?;
+            .with_context(|| format!("Não foi possível iniciar {nome}"))?;
         #[cfg(windows)]
         self.trabalho.associar(&filho)?;
         if let Some(local) = video_local {
@@ -451,31 +480,57 @@ impl Midia {
             .stderr
             .take()
             .context("Saída de diagnóstico ausente")?;
+        let diagnostico = Arc::new(Mutex::new(VecDeque::new()));
+        let historico = diagnostico.clone();
         self.tarefas.spawn(async move {
             let mut linhas = BufReader::new(erros).lines();
             while let Ok(Some(linha)) = linhas.next_line().await {
                 // O diagnóstico do helper pode estar em inglês; preservamos a mensagem original.
-                let _ = eventos.try_send(EventoMidia::Erro(linha));
+                if let Ok(mut historico) = historico.lock() {
+                    if historico.len() == 8 {
+                        historico.pop_front();
+                    }
+                    // Evita histórico ilimitado mesmo se o helper gerar uma linha enorme.
+                    historico.push_back(linha.chars().take(1000).collect());
+                }
+                let _ = eventos.try_send(EventoMidia::Erro(format!("{nome}: {linha}")));
             }
         });
-        self.filhos.push(filho);
+        self.filhos.push(ProcessoMidia {
+            nome,
+            filho,
+            diagnostico,
+        });
         Ok(())
     }
 
     /// Detecta falhas de captura/reprodução mesmo quando o processo não gerou stderr.
     pub fn verificar_processos(&mut self) -> Result<()> {
-        for filho in &mut self.filhos {
-            if let Some(estado) = filho.try_wait()? {
-                bail!("Um processo de mídia encerrou: {estado}");
+        for processo in &mut self.filhos {
+            if let Some(estado) = processo.filho.try_wait()? {
+                let diagnostico = processo
+                    .diagnostico
+                    .lock()
+                    .map(|linhas| linhas.iter().cloned().collect::<Vec<_>>().join(" | "))
+                    .unwrap_or_default();
+                bail!(
+                    "Processo de mídia '{}' encerrou: {estado}. {}",
+                    processo.nome,
+                    if diagnostico.is_empty() {
+                        "Sem diagnóstico adicional do helper."
+                    } else {
+                        &diagnostico
+                    }
+                );
             }
         }
         Ok(())
     }
 
     pub async fn encerrar(&mut self) {
-        for filho in &mut self.filhos {
-            let _ = filho.kill().await;
-            let _ = filho.wait().await;
+        for processo in &mut self.filhos {
+            let _ = processo.filho.kill().await;
+            let _ = processo.filho.wait().await;
         }
         self.tarefas.abort_all();
         while self.tarefas.join_next().await.is_some() {}

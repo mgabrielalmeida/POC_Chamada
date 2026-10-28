@@ -7,7 +7,7 @@ use bytes::BytesMut;
 use futures_util::{SinkExt, StreamExt};
 use rtc::{
     media_stream::MediaStreamTrack,
-    peer_connection::transport::RTCIceCandidateType,
+    peer_connection::transport::{RTCIceCandidate, RTCIceCandidateType},
     rtp,
     rtp_transceiver::rtp_sender::{
         RTCRtpCodec, RTCRtpCodecParameters, RTCRtpCodingParameters, RTCRtpEncodingParameters,
@@ -106,6 +106,7 @@ pub async fn executar(
         midia.encerrar().await;
     }
     if let Err(erro) = &resultado {
+        eprintln!("Chamada: {erro:#}");
         let _ = eventos
             .send(Evento::texto("erro", format!("{erro:#}")))
             .await;
@@ -244,8 +245,9 @@ async fn conectar(
             .with_media_engine(motor)
             .with_interceptor_registry(interceptores)
             .with_handler(Arc::new(Observador { coleta, mudancas }))
-            // O wildcard reúne endereços locais; STUN/TURN são opcionais.
-            .with_udp_addrs(vec!["0.0.0.0:0"])
+            // Cada wildcard reúne interfaces da própria família. Somente IPv4
+            // não cria sockets para STUN/TURN com DNS AAAA nem candidatos IPv6.
+            .with_udp_addrs(vec!["0.0.0.0:0", "[::]:0"])
             .build()
             .await?,
     );
@@ -259,11 +261,15 @@ async fn conectar(
         conexao
             .set_local_description(conexao.create_offer(None).await?)
             .await?;
-        aguardar_coleta(&mut coleta_rx).await?;
-        let descricao = conexao
-            .local_description()
-            .await
-            .context("Oferta local ausente")?;
+        let descricao = aguardar_coleta(
+            &mut coleta_rx,
+            &conexao,
+            rede.somente_retransmissao,
+            eventos,
+            &mut eventos_midia,
+            recursos.midia.as_mut().unwrap(),
+        )
+        .await?;
         ws.send(Message::Text(
             json!({"tipo":"descricao","descricao":descricao})
                 .to_string()
@@ -275,7 +281,7 @@ async fn conectar(
     let mut conectada = false;
     let mut caminho_ice = String::new();
     let mut vigilancia = tokio::time::interval(Duration::from_secs(1));
-    let inicio = tokio::time::Instant::now();
+    let mut inicio = tokio::time::Instant::now();
     loop {
         tokio::select! {
             mensagem = ws.next() => {
@@ -291,11 +297,12 @@ async fn conectar(
                                 conexao.set_remote_description(descricao).await?;
                                 if !ofertante {
                                     conexao.set_local_description(conexao.create_answer(None).await?).await?;
-                                    aguardar_coleta(&mut coleta_rx).await?;
-                                    let descricao = conexao.local_description().await.context("Resposta local ausente")?;
+                                    let descricao = aguardar_coleta(&mut coleta_rx, &conexao, rede.somente_retransmissao, eventos, &mut eventos_midia, recursos.midia.as_mut().unwrap()).await?;
                                     ws.send(Message::Text(json!({"tipo":"descricao","descricao":descricao}).to_string().into())).await?;
                                 }
                                 negociada = true;
+                                // O prazo do transporte começa depois da troca de SDP.
+                                inicio = tokio::time::Instant::now();
                             }
                             "saiu" => return Ok(()),
                             "erro" => bail!("Erro de sinalização: {}", mensagem["mensagem"]),
@@ -323,17 +330,7 @@ async fn conectar(
                     recursos.tarefas.spawn(receber_rtp(trilha, if video { destino_video } else { destino_audio }, if video { 96 } else { 111 }));
                 }
             },
-            Some(evento) = eventos_midia.recv() => match evento {
-                EventoMidia::Quadro { local, rgba } => {
-                    // O canal é limitado; quadros são descartados quando a UI atrasa.
-                    let _ = eventos.try_send(Evento { tipo: if local { "video_local" } else { "video_remoto" }.into(), texto: String::new(), rgba });
-                }
-                EventoMidia::AudioDecodificado => { let _ = eventos.try_send(Evento::texto("audio_teste", "PCM remoto decodificado")); }
-                EventoMidia::Erro(erro) => {
-                    eprintln!("Mídia: {erro}");
-                    let _ = eventos.try_send(Evento::texto("aviso", erro));
-                }
-            },
+            Some(evento) = eventos_midia.recv() => publicar_midia(evento, eventos),
             _ = vigilancia.tick() => {
                 recursos.midia.as_mut().unwrap().verificar_processos()?;
                 if conectada {
@@ -341,7 +338,7 @@ async fn conectar(
                         if let Some(transporte) = remetente.transport().await? {
                             if let Some(par) = transporte.ice_transport().get_selected_candidate_pair().await? {
                                 let retransmitida = par.local().typ == RTCIceCandidateType::Relay || par.remote().typ == RTCIceCandidateType::Relay;
-                                let caminho = format!("Caminho ICE: {} (local={}, remoto={}).", if retransmitida { "retransmissão TURN" } else { "direto" }, par.local().typ, par.remote().typ);
+                                let caminho = format!("Caminho ICE: {} (local={}; remoto={}).", if retransmitida { "retransmissão TURN" } else { "direto" }, descrever_candidato(par.local()), descrever_candidato(par.remote()));
                                 if caminho != caminho_ice {
                                     eventos.send(Evento::texto("caminho_ice", &caminho)).await?;
                                     caminho_ice = caminho;
@@ -350,21 +347,113 @@ async fn conectar(
                         }
                     }
                 }
-                if !conectada && inicio.elapsed() > Duration::from_secs(30) { bail!("A conexão WebRTC não foi estabelecida em 30 segundos"); }
+                if !conectada && inicio.elapsed() > Duration::from_secs(if negociada { 30 } else { 45 }) {
+                    bail!("{}", if negociada { "A conexão WebRTC não foi estabelecida em 30 segundos após a troca de SDP" } else { "A outra pessoa não enviou a descrição WebRTC em 45 segundos" });
+                }
                 if eventos.is_closed() { return Ok(()); }
             }
         }
     }
 }
 
-async fn aguardar_coleta(coleta: &mut watch::Receiver<bool>) -> Result<()> {
-    timeout(
-        Duration::from_secs(30),
-        coleta.wait_for(|completa| *completa),
+/// Endereços ficam apenas no diagnóstico local; não incluem senha, token ou SDP.
+fn descrever_candidato(candidato: &RTCIceCandidate) -> String {
+    let (familia, endereco) = match candidato.address.parse::<std::net::IpAddr>() {
+        Ok(std::net::IpAddr::V6(ip)) => ("IPv6", format!("[{ip}]")),
+        Ok(std::net::IpAddr::V4(ip)) => ("IPv4", ip.to_string()),
+        Err(_) => ("nome", candidato.address.clone()),
+    };
+    format!(
+        "{} {} {familia} {endereco}:{}",
+        candidato.typ, candidato.protocol, candidato.port
     )
-    .await
-    .context("Tempo esgotado ao reunir os endereços ICE")??;
-    Ok(())
+}
+
+fn publicar_midia(evento: EventoMidia, eventos: &mpsc::Sender<Evento>) {
+    let evento = match evento {
+        EventoMidia::Quadro { local, rgba } => Evento {
+            tipo: if local { "video_local" } else { "video_remoto" }.into(),
+            texto: String::new(),
+            rgba,
+        },
+        EventoMidia::AudioDecodificado => Evento::texto("audio_teste", "PCM remoto decodificado"),
+        EventoMidia::Erro(erro) => {
+            eprintln!("Mídia: {erro}");
+            Evento::texto("aviso", erro)
+        }
+    };
+    // Descarta quadros se a interface estiver atrasada; nunca acumula vídeo.
+    let _ = eventos.try_send(evento);
+}
+
+async fn aguardar_coleta(
+    coleta: &mut watch::Receiver<bool>,
+    conexao: &Arc<dyn PeerConnection>,
+    somente_retransmissao: bool,
+    eventos: &mpsc::Sender<Evento>,
+    eventos_midia: &mut mpsc::Receiver<EventoMidia>,
+    midia: &mut Midia,
+) -> Result<RTCSessionDescription> {
+    // Limita a espera antes do SDP: o ICE remoto já pode estar verificando pares.
+    let prazo = tokio::time::sleep(Duration::from_secs(10));
+    tokio::pin!(prazo);
+    let mut vigilancia = tokio::time::interval(Duration::from_secs(1));
+    let parcial = loop {
+        tokio::select! {
+            resultado = coleta.wait_for(|completa| *completa) => {
+                resultado.context("Coletor ICE encerrado")?;
+                break false;
+            }
+            _ = &mut prazo => break true,
+            Some(evento) = eventos_midia.recv() => publicar_midia(evento, eventos),
+            _ = vigilancia.tick() => midia.verificar_processos()?,
+        }
+    };
+    let descricao = conexao
+        .local_description()
+        .await
+        .context("Descrição ICE local ausente")?;
+    let candidatos: Vec<_> = descricao
+        .sdp
+        .lines()
+        .filter(|linha| linha.starts_with("a=candidate:"))
+        .collect();
+    let relays = candidatos
+        .iter()
+        .filter(|linha| linha.contains(" typ relay"))
+        .count();
+    eprintln!(
+        "ICE: coleta {}; {} candidatos, {relays} relay.",
+        if parcial {
+            "parcial após 10 s"
+        } else {
+            "completa"
+        },
+        candidatos.len()
+    );
+    if candidatos.is_empty() || somente_retransmissao && relays == 0 {
+        bail!(
+            "Coleta ICE sem {}. Confira DNS, acesso UDP 3478 ao Windows S e credenciais TURN.",
+            if somente_retransmissao {
+                "candidato relay"
+            } else {
+                "candidatos disponíveis"
+            }
+        );
+    }
+    // SDP completo dos candidatos disponíveis, sem trickle ICE. Uma interface
+    // sem resposta não deve inutilizar candidatos já obtidos por outra. Os que
+    // chegarem após este snapshot não serão enviados nesta negociação.
+    if parcial {
+        let _ = eventos.try_send(Evento::texto(
+            "estado",
+            format!(
+                "Coleta ICE parcial após 10 s; negociando com {} candidatos ({relays} relay).",
+                candidatos.len(),
+            ),
+        ));
+    }
+    Ok(descricao)
 }
 
 async fn enviar_rtp(socket: Arc<UdpSocket>, trilha: Arc<TrackLocalStaticRTP>, ssrc: u32) {

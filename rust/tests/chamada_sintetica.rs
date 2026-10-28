@@ -9,6 +9,13 @@ use tokio::{
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 #[ignore = "Requer scripts/preparar-midia.ps1; inicia processos FFmpeg locais"]
 async fn duas_chamadas_seguidas_transportam_e_decodificam_video_e_audio() {
+    // O mesmo ensaio serve ao modo normal e ao TURN forçado do pacote.
+    // Lê somente a política; nunca imprime o JSON que contém credenciais.
+    let somente_turn = std::env::var_os("CHAMADA_CONFIG")
+        .and_then(|caminho| std::fs::read_to_string(caminho).ok())
+        .and_then(|texto| serde_json::from_str::<serde_json::Value>(&texto).ok())
+        .and_then(|json| json["somente_retransmissao"].as_bool())
+        .unwrap_or(false);
     let ouvinte = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let endereco = format!("ws://{}", ouvinte.local_addr().unwrap());
     let servidor = tokio::spawn(sinalizacao::executar(ouvinte));
@@ -52,7 +59,15 @@ async fn duas_chamadas_seguidas_transportam_e_decodificam_video_e_audio() {
                     }
                     "audio_teste" => audios[indice] += 1,
                     "caminho_ice" => {
-                        assert!(evento.texto.contains("direto"), "{}", evento.texto);
+                        assert!(
+                            evento.texto.contains(if somente_turn {
+                                "retransmissão TURN"
+                            } else {
+                                "direto"
+                            }),
+                            "{}",
+                            evento.texto
+                        );
                         caminhos[indice] = true;
                         eprintln!("Cliente {indice}: {}", evento.texto);
                     }

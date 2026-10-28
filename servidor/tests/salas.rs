@@ -85,7 +85,16 @@ async fn sala_invalida_e_mensagem_invalida_nao_deixam_participante_preso() {
 
 #[tokio::test]
 async fn token_invalido_nao_ocupa_sala_e_token_valido_permite_negociar() {
-    let ouvinte = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    verificar_token_e_sala("127.0.0.1:0").await;
+}
+
+#[tokio::test]
+async fn token_e_sala_funcionam_por_websocket_ipv6() {
+    verificar_token_e_sala("[::1]:0").await;
+}
+
+async fn verificar_token_e_sala(escuta: &str) {
+    let ouvinte = TcpListener::bind(escuta).await.unwrap();
     let endereco = format!("ws://{}", ouvinte.local_addr().unwrap());
     let servidor = tokio::spawn(sinalizacao::executar_com_token(
         ouvinte,
