@@ -333,3 +333,15 @@ estão no [registro da chamada](diagnostico-primeira-chamada.md).
 - Nenhuma nova execução de build, chamada, captura real ou ensaio de rede foi
   realizada para esta mudança de documentação. Os critérios de aceite e os
   resultados históricos permanecem distintos dessa conferência documental.
+
+## Ensaio físico A/B — 29/10/2026
+
+- A e B, em redes diferentes, entraram pelo WSS IPv6 autenticado nos dois papéis
+  e conectaram nos modos normal e TURN forçado. O vídeo passou nos dois sentidos.
+- O áudio de A chegou ao B com cerca de 30 s de atraso. O áudio de B não chegou
+  ao A em nenhuma chamada. No TURN forçado, vídeo e áudio pioraram (S estava em
+  hotspot de celular).
+- Caminho ICE, durações e logs dos participantes não foram registrados.
+  A Etapa 2 continua sem aceite.
+- Resultados, hipóteses de causa e pendências estão no
+  [registro do ensaio](ensaio-fisico-29-10.md). Nenhum código foi alterado.

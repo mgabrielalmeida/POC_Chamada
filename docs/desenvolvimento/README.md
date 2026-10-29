@@ -33,6 +33,7 @@ Essas são evidências históricas; não indicam que os serviços estejam ativos
 | [Validação](validacao.md) | Comandos executados, versões observadas e limitações de cada rodada |
 | [Auditoria IPv6](auditoria-ipv6.md) | Inspeção da versão fixada, alterações IPv6 e ensaio TURN isolado |
 | [Diagnóstico da primeira chamada](diagnostico-primeira-chamada.md) | Falhas dos helpers, coleta ICE, filtros coturn e correções verificadas |
+| [Ensaio físico de 29/10](ensaio-fisico-29-10.md) | Chamada A/B real: vídeo nos dois sentidos, áudio atrasado e áudio de B ausente |
 | [Dificuldades do WebRTC](../estudos/webrtc/dificuldades-e-decisoes.md) | Explicação didática das causas e das soluções |
 
 Os dois relatórios datados permanecem aqui porque documentam investigações e
