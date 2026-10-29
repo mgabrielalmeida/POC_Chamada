@@ -98,7 +98,7 @@ acompanha esses blocos na ordem de execução.
 | `aguardar_coleta` | Espera conclusão ou dez segundos, verifica helpers e lê o SDP disponível | Não tratar o snapshot como coleta necessariamente completa; manter exigência relay no modo forçado |
 | `publicar_midia` | Converte eventos internos em vídeo local/remoto, áudio de teste ou aviso | Usa `try_send`; eventos desse caminho podem ser descartados quando o canal enche |
 | `descrever_candidato` | Formata tipo, protocolo, família, endereço e porta | Colchetes em IPv6 ajudam a distinguir endereço de porta; não incluir credenciais/SDP bruto |
-| `enviar_rtp` | Lê RTP local, filtra payload types, ajusta SSRC e escreve na trilha | Preservar coerência entre parâmetros da trilha e pacotes do encoder |
+| `enviar_rtp` | Lê RTP local desde a criação da trilha, descarta até `Connected`, filtra payload types, ajusta SSRC e escreve na trilha | Preservar coerência entre parâmetros da trilha e pacotes do encoder; não deixar o socket acumular captura antiga |
 | `receber_rtp` | Lê trilha remota, adapta cabeçalho e envia ao decoder local | Não confundir RTP codificado com quadro RGBA pronto |
 
 `watch` serve a sinais cujo valor atual basta, como coleta concluída ou parada.

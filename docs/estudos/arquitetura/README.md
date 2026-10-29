@@ -59,7 +59,8 @@ um encoder VP8 ou Opus.
 3. A chamada carrega a configuração, abre sinalização e aguarda o outro participante.
 4. Depois de `pronto`, prepara helpers, codecs e trilhas, e cria a PeerConnection.
 5. Oferta e resposta carregam um retrato dos candidatos ICE disponíveis.
-6. O estado `Connected` libera as tarefas que enviam RTP para as trilhas locais.
+6. As tarefas que leem o RTP dos helpers começam junto com as trilhas e descartam
+   a captura até `Connected`; a partir daí, escrevem nas trilhas locais.
 7. Trilhas remotas entregam RTP aos decodificadores; vídeo retorna pelo stream.
 8. Saída, erro ou cancelamento passam pelo mesmo encerramento de recursos.
 

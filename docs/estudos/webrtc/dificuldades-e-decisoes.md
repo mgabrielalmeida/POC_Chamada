@@ -165,6 +165,30 @@ Esses casos mostram por que estudar WebRTC exige acompanhar a sessão inteira,
 mas não autoriza atribuir todos os problemas à biblioteca de protocolos.
 Veja [servidor](../servidor/arquivos.md) e [ponte](../ponte-flutter-rust/arquivos.md).
 
+## 11. O áudio capturado durante a negociação virava atraso permanente
+
+**Origem: integração dos tempos de mídia e rede.** Os helpers de câmera e
+microfone começam logo depois de `pronto`, mas `enviar_rtp` só era criado em
+`Connected`. Durante a coleta ICE e a troca de SDP, ninguém lia os sockets de
+loopback. O Windows guarda até 64 KB num socket UDP sem leitura. Em pacotes
+Opus pequenos, isso equivale a dezenas de segundos de áudio. Na conexão, o
+acúmulo era enviado de uma vez. O `ffplay` remoto reproduz no ritmo real a
+partir do pacote mais antigo, e o atraso não diminuía mais. No ensaio físico de
+29/10, o áudio chegou com cerca de 30 s de atraso, enquanto o vídeo, cujo
+receptor não segue um relógio de reprodução, logo voltou ao tempo real.
+
+**Solução adotada:** `enviar_rtp` é criado junto com cada trilha e lê o socket
+desde o início. Até `Connected`, sinalizado por um `watch`, descarta os
+pacotes; depois, repassa normalmente. O vídeo também perde a captura anterior
+e se recupera no próximo quadro-chave (`-g 10`, cerca de 1 s).
+
+**Evidência e limite:** no Windows S, um socket UDP de loopback sem leitura
+reteve 713 datagramas de 92 B (~14 s a 50 pacotes/s) e 1639 de 40 B (~33 s),
+coerente com um buffer de 64 KB contado em bytes. Opus em VBR gera pacotes
+pequenos no silêncio. O teste sintético de duas chamadas continua passando,
+mas não mede latência. A confirmação depende de novo ensaio físico; o
+[registro do ensaio](../../desenvolvimento/ensaio-fisico-29-10.md) traz os detalhes.
+
 ## Limites ainda presentes e possíveis próximos estudos
 
 | Limite atual | O que seria necessário estudar antes de ampliar |

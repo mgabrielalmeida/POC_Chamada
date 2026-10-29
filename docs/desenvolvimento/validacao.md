@@ -345,3 +345,18 @@ estão no [registro da chamada](diagnostico-primeira-chamada.md).
   A Etapa 2 continua sem aceite.
 - Resultados, hipóteses de causa e pendências estão no
   [registro do ensaio](ensaio-fisico-29-10.md). Nenhum código foi alterado.
+
+## Correção do atraso do áudio — 29/10/2026
+
+- Causa: a captura da negociação ficava acumulada no socket de loopback até
+  `Connected` e virava atraso permanente no `ffplay` remoto. Medição no S: um
+  socket sem leitura reteve 713 datagramas de 92 B e 1639 de 40 B (64 KB).
+- Correção: `enviar_rtp` lê desde a criação da trilha e descarta até `Connected`.
+- `cargo test --locked -p chamada`: passou. `chamada_sintetica` com `--ignored`:
+  passou (duas chamadas, vídeo e PCM decodificados). O Clippy mostrou apenas
+  avisos que já existiam antes desta mudança.
+- `flutter build windows --release`: concluído. Apenas `chamada.dll` mudou
+  (SHA-256 `36144CBD812C05ACDAA5C06664BB818C73756B02417195CD7A889B1EE97BEE32`).
+- Pacote de atualização para A e B gerado fora do Git. O efeito no atraso real
+  ainda não foi observado em chamada física. Detalhes no
+  [registro do ensaio](ensaio-fisico-29-10.md#correção-do-atraso-do-áudio).

@@ -184,6 +184,7 @@ async fn conectar(
     let captura_video = midia.video.clone();
     let captura_audio = midia.audio.clone();
     let (coleta, mut coleta_rx) = watch::channel(false);
+    let (conectada_tx, conectada_rx) = watch::channel(false);
     let (mudancas, mut mudancas_rx) = mpsc::unbounded_channel();
     let mut motor = MediaEngine::default();
     let mut trilhas = Vec::new();
@@ -236,7 +237,15 @@ async fn conectar(
                 ..Default::default()
             }],
         )));
-        trilhas.push((trilha, socket, ssrc));
+        // A leitura começa já, durante a negociação, para descartar a captura
+        // anterior à conexão em vez de deixá-la acumulada no socket.
+        recursos.tarefas.spawn(enviar_rtp(
+            socket,
+            trilha.clone(),
+            ssrc,
+            conectada_rx.clone(),
+        ));
+        trilhas.push(trilha);
     }
     let interceptores = register_default_interceptors(Registry::new(), &mut motor)?;
     let conexao: Arc<dyn PeerConnection> = Arc::new(
@@ -252,7 +261,7 @@ async fn conectar(
             .await?,
     );
     recursos.conexao = Some(conexao.clone());
-    for (trilha, _, _) in &trilhas {
+    for trilha in &trilhas {
         conexao
             .add_track(trilha.clone() as Arc<dyn TrackLocal>)
             .await?;
@@ -318,9 +327,7 @@ async fn conectar(
                     if estado == RTCPeerConnectionState::Connected && !conectada {
                         conectada = true;
                         eventos.send(Evento::texto("estado", "WebRTC conectado. Áudio e vídeo em transmissão.")).await?;
-                        for (trilha, socket, ssrc) in trilhas.drain(..) {
-                            recursos.tarefas.spawn(enviar_rtp(socket, trilha, ssrc));
-                        }
+                        let _ = conectada_tx.send(true);
                     } else if matches!(estado, RTCPeerConnectionState::Failed | RTCPeerConnectionState::Closed | RTCPeerConnectionState::Disconnected) {
                         bail!("Conexão WebRTC encerrada: {estado}");
                     }
@@ -456,9 +463,20 @@ async fn aguardar_coleta(
     Ok(descricao)
 }
 
-async fn enviar_rtp(socket: Arc<UdpSocket>, trilha: Arc<TrackLocalStaticRTP>, ssrc: u32) {
+/// O socket de loopback retém 64 KB sem leitura: dezenas de segundos de Opus.
+/// Repassado de uma vez na conexão, esse acúmulo virava atraso permanente no
+/// `ffplay` remoto, que reproduz em tempo real. Antes da conexão, descarta.
+async fn enviar_rtp(
+    socket: Arc<UdpSocket>,
+    trilha: Arc<TrackLocalStaticRTP>,
+    ssrc: u32,
+    conectada: watch::Receiver<bool>,
+) {
     let mut dados = vec![0; 1600];
     while let Ok((tamanho, _)) = socket.recv_from(&mut dados).await {
+        if !*conectada.borrow() {
+            continue;
+        }
         if let Ok(mut pacote) =
             rtp::packet::Packet::unmarshal(&mut BytesMut::from(&dados[..tamanho]))
         {

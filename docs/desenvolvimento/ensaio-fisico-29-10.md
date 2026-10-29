@@ -78,9 +78,13 @@ Se a hipótese estiver certa, chamadas que negociam mais rápido terão menos
 atraso. Outra forma: contar quantos pacotes `enviar_rtp` lê do socket no
 primeiro segundo após a conexão.
 
-**Direções de correção, não implementadas:** começar a ler o socket e descartar
-os pacotes enquanto não houver conexão, iniciar o microfone só depois de
-`Connected`, ou descartar o acúmulo no momento da conexão.
+**Medição posterior no Windows S:** um socket UDP de loopback sem leitura reteve
+713 datagramas de 92 B (~14 s de Opus a 50 pacotes/s) e 1639 de 40 B (~33 s).
+O limite é de 64 KB contados em bytes. Opus em VBR produz pacotes menores no
+silêncio, então ~30 s de atraso é compatível com o mecanismo.
+
+**Correção aplicada** (veja [abaixo](#correção-do-atraso-do-áudio)): ler o socket
+desde a criação da trilha e descartar os pacotes até `Connected`.
 
 ### 2. Áudio de B não chega ao A (nos dois modos e nos dois papéis)
 
@@ -151,12 +155,33 @@ enviado por A e por B.
 bytes do coturn. Repetir o modo TURN com o AnyDesk fechado. Se possível, testar
 S numa conexão fixa em vez do hotspot.
 
+## Correção do atraso do áudio
+
+Aplicada após o ensaio, apenas para a causa 1. As causas 2 e 3 continuam abertas.
+
+- **Código:** em [chamada.rs](../../rust/src/chamada.rs), cada `enviar_rtp` é
+  criado junto com sua trilha e lê o socket do helper desde o início. Um
+  `watch` muda para `true` em `Connected`; até lá, os pacotes são descartados.
+  Nenhum outro comportamento mudou.
+- **Verificações:** `cargo test --locked -p chamada` passou. O ensaio
+  `chamada_sintetica`, executado com `--ignored`, passou com duas chamadas
+  seguidas decodificando vídeo e PCM. `flutter build windows --release`
+  concluiu. Esses testes não medem latência; o efeito sobre o atraso ainda
+  precisa ser confirmado no ensaio físico.
+- **Pacote:** `POC_Chamada_Etapa2_Atualizacao_Audio_20261029-083819.zip`, em
+  `C:\POC_Servidor\distribuicao` (fora do Git). Contém só `Release\chamada.dll`
+  (SHA-256 `36144CBD…7BEE32`), `VERSAO.txt` e `LEIA-ME-ATUALIZACAO.txt`.
+  `poc_chamada.exe`, `data\app.so` e as demais DLLs ficaram com o mesmo hash
+  do pacote Corrigido. Instalar nos **dois** participantes: cada um descarta o
+  próprio áudio capturado antes da conexão.
+
 ## Pendências para o próximo ensaio
 
-1. Confirmar no B qual microfone é usado e se ele grava áudio (seção 2).
-2. Registrar o `Caminho ICE` de A e B em cada chamada, além da duração.
-3. Guardar os `.stderr.log` de A e B e o log do coturn de cada chamada, fora do Git.
-4. Medir o atraso do áudio contra o tempo de negociação (seção 1).
-5. Repetir o modo TURN sem AnyDesk e, se possível, com S fora do hotspot.
-6. Só então decidir as correções de código (descarte do acúmulo de áudio,
-   seleção de microfone e eventual FEC), que ficaram fora desta rodada.
+1. Instalar a atualização em A e B e conferir o hash do `chamada.dll`.
+2. Confirmar que o áudio A → B chega sem o atraso de ~30 s, nos dois modos.
+3. Confirmar no B qual microfone é usado e se ele grava áudio (seção 2).
+4. Registrar o `Caminho ICE` de A e B em cada chamada, além da duração.
+5. Guardar os `.stderr.log` de A e B e o log do coturn de cada chamada, fora do Git.
+6. Repetir o modo TURN sem AnyDesk e, se possível, com S fora do hotspot.
+7. Decidir as correções das causas 2 e 3 (seleção de microfone e eventual FEC)
+   depois dessas evidências.

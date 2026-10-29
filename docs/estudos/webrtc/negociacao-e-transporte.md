@@ -106,7 +106,9 @@ O laço principal usa `tokio::select!` para atender WebSocket, mudanças WebRTC,
 eventos de mídia e um pulso de vigilância. Ele não precisa escolher entre ficar
 esperando vídeo e continuar respondendo ao servidor.
 
-Na primeira mudança para `Connected`, cria uma tarefa `enviar_rtp` por trilha.
+As tarefas `enviar_rtp`, uma por trilha, já existem desde a criação das trilhas.
+Na primeira mudança para `Connected`, um `watch` avisa que elas podem escrever
+na trilha; antes disso, só leem e descartam.
 `Failed`, `Closed` ou `Disconnected` terminam a sessão como erro. Encerrar em
 `Disconnected` é a política simples adotada aqui; a aplicação não tenta recuperar
 uma interrupção transitória nem implementa reconexão automática.
@@ -116,6 +118,12 @@ uma interrupção transitória nem implementa reconexão automática.
 O FFmpeg produz RTP no loopback. `enviar_rtp` lê o datagrama, interpreta-o com
 `Packet::unmarshal`, aceita os payload types 96 ou 111 e substitui o SSRC pelo
 valor declarado para a trilha. Depois chama `write_rtp`.
+
+Antes de `Connected`, o datagrama é lido e descartado. Os helpers começam a
+capturar assim que a sala fica pronta, e um socket sem leitura guardaria até
+64 KB da negociação. Esse acúmulo, entregue de uma vez, virava atraso
+permanente no áudio remoto; veja a
+[dificuldade 11](dificuldades-e-decisoes.md#11-o-áudio-capturado-durante-a-negociação-virava-atraso-permanente).
 
 O ajuste existe porque o encoder auxiliar e a PeerConnection não negociaram
 diretamente entre si. Se cada um usar uma identificação diferente para a mesma

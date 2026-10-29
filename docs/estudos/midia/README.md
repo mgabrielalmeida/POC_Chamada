@@ -69,6 +69,13 @@ acompanhar, um quadro é descartado em vez de virar atraso acumulado. O descarte
 nesses canais afeta apresentação local/remota; não é um controlador de
 congestionamento dos pacotes enviados pelo WebRTC.
 
+Os capturadores começam antes da conexão, mas o RTP deles só é útil depois de
+`Connected`. Até lá, `enviar_rtp` lê e descarta os pacotes. Sem essa leitura,
+o socket de loopback acumulava a captura da negociação e a entregava de uma
+vez: o `ffplay` remoto reproduz áudio em tempo real, então o acúmulo virava
+atraso permanente. O vídeo se recuperava porque seu receptor não espera o
+relógio de reprodução.
+
 Rust verifica a cada segundo se algum helper terminou. Nome, código de saída
 e últimas linhas de stderr ajudam a distinguir câmera, microfone e receptores.
 O [problema de timeout dos receptores](../webrtc/dificuldades-e-decisoes.md)
